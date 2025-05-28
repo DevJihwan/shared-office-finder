@@ -2,7 +2,13 @@ const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+// 필요한 모듈들 import
+const NaverMapScraper = require('./scrapers/naverMapScraper');
+const dataProcessor = require('./utils/dataProcessor');
+const { regions, defaultKeywords } = require('./config/regions');
+
 let mainWindow;
+let scraper;
 
 /**
  * 메인 윈도우 생성
@@ -176,9 +182,35 @@ function sendProgress(progress, status) {
   }
 }
 
+/**
+ * 수집 통계 계산
+ */
+function calculateStatistics(data) {
+  const stats = {
+    totalCount: data.length,
+    withPhoneNumber: data.filter(item => item['전화번호'] && item['전화번호'].trim()).length,
+    withWebsite: data.filter(item => item['홈페이지'] && item['홈페이지'].trim()).length,
+    regionStats: {}
+  };
+
+  // 지역별 통계
+  data.forEach(item => {
+    const region = item['지역'] || 'Unknown';
+    if (!stats.regionStats[region]) {
+      stats.regionStats[region] = 0;
+    }
+    stats.regionStats[region]++;
+  });
+
+  return stats;
+}
+
 // Electron 앱 이벤트 처리
 app.whenReady().then(() => {
   createWindow();
+  
+  // Scraper 인스턴스 생성
+  scraper = new NaverMapScraper();
 });
 
 app.on('window-all-closed', () => {
@@ -194,6 +226,98 @@ app.on('activate', () => {
 });
 
 // IPC 핸들러들
+
+/**
+ * 기본 키워드 반환
+ */
+ipcMain.handle('get-default-keywords', async () => {
+  try {
+    return defaultKeywords;
+  } catch (error) {
+    console.error(`기본 키워드 로드 오류: ${error.message}`);
+    return ['공유오피스', '코워킹스페이스'];
+  }
+});
+
+/**
+ * 데이터 수집 시작
+ */
+ipcMain.handle('start-scraping', async (event, keywords) => {
+  try {
+    sendLogMessage('info', `데이터 수집을 시작합니다. 키워드: ${keywords.join(', ')}`);
+    sendProgress(0, '데이터 수집 준비 중...');
+
+    // 모든 데이터 수집
+    const rawData = await scraper.collectAllData(
+      regions,
+      keywords,
+      (progress, status) => {
+        sendProgress(progress, status);
+      },
+      (type, message) => {
+        sendLogMessage(type, message);
+      }
+    );
+
+    sendLogMessage('info', '데이터 정제 중...');
+    sendProgress(95, '데이터 정제 중...');
+
+    // 데이터 정제 및 처리
+    const processedData = dataProcessor.processData(rawData);
+    const deduplicatedData = dataProcessor.deduplicateData(processedData);
+    const cleanedData = dataProcessor.cleanData(deduplicatedData);
+
+    // 통계 계산
+    const statistics = calculateStatistics(cleanedData);
+
+    sendProgress(100, '데이터 수집 완료!');
+    sendLogMessage('success', `데이터 수집이 완료되었습니다. 총 ${cleanedData.length}개의 데이터를 수집했습니다.`);
+
+    return {
+      success: true,
+      data: cleanedData,
+      count: cleanedData.length,
+      statistics: statistics
+    };
+
+  } catch (error) {
+    console.error(`데이터 수집 오류: ${error.message}`);
+    sendLogMessage('error', `데이터 수집 실패: ${error.message}`);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
+/**
+ * 데이터 저장
+ */
+ipcMain.handle('save-data', async (event, data, filePath) => {
+  try {
+    sendLogMessage('info', `데이터를 저장 중입니다: ${filePath}`);
+
+    // 데이터 유효성 검사
+    const validation = dataProcessor.validateData(data);
+    if (!validation.valid) {
+      throw new Error(validation.message);
+    }
+
+    // 파일 저장
+    dataProcessor.saveData(data, filePath);
+
+    sendLogMessage('success', `데이터가 성공적으로 저장되었습니다: ${filePath}`);
+    return { success: true };
+
+  } catch (error) {
+    console.error(`데이터 저장 오류: ${error.message}`);
+    sendLogMessage('error', `데이터 저장 실패: ${error.message}`);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
 
 /**
  * 파일 저장 대화상자 표시
