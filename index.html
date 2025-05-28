@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>공유오피스 데이터 수집기</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 2rem;
+            font-weight: 300;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .control-panel {
+            width: 350px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            height: fit-content;
+        }
+
+        .control-panel h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #34495e;
+            font-weight: 500;
+        }
+
+        .keywords-container {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+        }
+
+        .keyword-input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .keyword-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .add-keyword-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .add-keyword-btn:hover {
+            background: #2980b9;
+        }
+
+        .keyword-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .keyword-tag {
+            background: #3498db;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .keyword-tag .remove {
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .start-button {
+            width: 100%;
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .start-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+
+        .start-button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .log-panel {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .log-panel h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+
+        .log-container {
+            flex: 1;
+            background: #2c3e50;
+            border-radius: 10px;
+            padding: 15px;
+            overflow-y: auto;
+            max-height: 500px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 4px 0;
+        }
+
+        .log-entry.info {
+            color: #74b9ff;
+        }
+
+        .log-entry.success {
+            color: #00b894;
+        }
+
+        .log-entry.warning {
+            color: #fdcb6e;
+        }
+
+        .log-entry.error {
+            color: #e84393;
+        }
+
+        .clear-log-btn {
+            margin-top: 10px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            align-self: flex-start;
+        }
+
+        .clear-log-btn:hover {
+            background: #c0392b;
+        }
+
+        .progress-container {
+            margin-top: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .default-keywords {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+
+        .default-keywords button {
+            background: #ecf0f1;
+            border: 1px solid #bdc3c7;
+            padding: 4px 8px;
+            margin: 2px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+
+        .default-keywords button:hover {
+            background: #d5dbdb;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏢 공유오피스 데이터 수집기</h1>
+    </div>
+
+    <div class="container">
+        <div class="control-panel">
+            <h2>검색 설정</h2>
+            
+            <div class="form-group">
+                <label>검색 키워드</label>
+                <div class="keywords-container">
+                    <div class="keyword-input-group">
+                        <input type="text" id="keywordInput" class="keyword-input" placeholder="키워드를 입력하세요" maxlength="20">
+                        <button id="addKeywordBtn" class="add-keyword-btn">추가</button>
+                    </div>
+                    <div id="keywordList" class="keyword-list"></div>
+                    
+                    <div class="default-keywords">
+                        <div style="margin-bottom: 5px;">기본 키워드:</div>
+                        <button onclick="addDefaultKeyword('공유오피스')">공유오피스</button>
+                        <button onclick="addDefaultKeyword('아임스페이스')">아임스페이스</button>
+                        <button onclick="addDefaultKeyword('스마트탑오피스')">스마트탑오피스</button>
+                        <button onclick="addDefaultKeyword('더스페이스')">더스페이스</button>
+                        <button onclick="addDefaultKeyword('스페이스엑스키')">스페이스엑스키</button>
+                    </div>
+                </div>
+            </div>
+
+            <button id="startButton" class="start-button">🚀 데이터 수집 시작</button>
+            
+            <div id="progressContainer" class="progress-container">
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="log-panel">
+            <h2>📋 실행 로그</h2>
+            <div id="logContainer" class="log-container">
+                <div class="log-entry info">프로그램이 시작되었습니다. 키워드를 추가하고 데이터 수집을 시작하세요.</div>
+            </div>
+            <button id="clearLogBtn" class="clear-log-btn">로그 지우기</button>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        
+        let keywords = [];
+        let isScrapingInProgress = false;
+
+        // DOM 요소들
+        const keywordInput = document.getElementById('keywordInput');
+        const addKeywordBtn = document.getElementById('addKeywordBtn');
+        const keywordList = document.getElementById('keywordList');
+        const startButton = document.getElementById('startButton');
+        const logContainer = document.getElementById('logContainer');
+        const clearLogBtn = document.getElementById('clearLogBtn');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+
+        // 키워드 추가 함수
+        function addKeyword(keyword) {
+            if (!keyword.trim()) return;
+            
+            keyword = keyword.trim();
+            if (keywords.includes(keyword)) {
+                addLogEntry('warning', `"${keyword}"는 이미 추가된 키워드입니다.`);
+                return;
+            }
+            
+            keywords.push(keyword);
+            updateKeywordList();
+            addLogEntry('info', `키워드 "${keyword}"가 추가되었습니다.`);
+        }
+
+        // 키워드 목록 업데이트
+        function updateKeywordList() {
+            keywordList.innerHTML = '';
+            keywords.forEach((keyword, index) => {
+                const tag = document.createElement('div');
+                tag.className = 'keyword-tag';
+                tag.innerHTML = `
+                    <span>${keyword}</span>
+                    <span class="remove" onclick="removeKeyword(${index})">×</span>
+                `;
+                keywordList.appendChild(tag);
+            });
+        }
+
+        // 키워드 제거
+        function removeKeyword(index) {
+            const removedKeyword = keywords[index];
+            keywords.splice(index, 1);
+            updateKeywordList();
+            addLogEntry('info', `키워드 "${removedKeyword}"가 제거되었습니다.`);
+        }
+
+        // 기본 키워드 추가
+        function addDefaultKeyword(keyword) {
+            addKeyword(keyword);
+        }
+
+        // 로그 엔트리 추가
+        function addLogEntry(type, message) {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // 이벤트 리스너들
+        addKeywordBtn.addEventListener('click', () => {
+            addKeyword(keywordInput.value);
+            keywordInput.value = '';
+        });
+
+        keywordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addKeyword(keywordInput.value);
+                keywordInput.value = '';
+            }
+        });
+
+        startButton.addEventListener('click', async () => {
+            if (keywords.length === 0) {
+                addLogEntry('error', '검색할 키워드를 먼저 추가해주세요.');
+                return;
+            }
+
+            if (isScrapingInProgress) {
+                addLogEntry('warning', '이미 데이터 수집이 진행 중입니다.');
+                return;
+            }
+
+            isScrapingInProgress = true;
+            startButton.disabled = true;
+            startButton.textContent = '⏳ 데이터 수집 중...';
+            progressContainer.style.display = 'block';
+            
+            try {
+                const result = await ipcRenderer.invoke('start-scraping', keywords);
+                
+                if (result.success) {
+                    addLogEntry('success', `데이터 수집이 완료되었습니다! 총 ${result.count}개의 데이터가 수집되었습니다.`);
+                } else {
+                    addLogEntry('error', `데이터 수집 중 오류가 발생했습니다: ${result.error}`);
+                }
+            } catch (error) {
+                addLogEntry('error', `예상치 못한 오류가 발생했습니다: ${error.message}`);
+            } finally {
+                isScrapingInProgress = false;
+                startButton.disabled = false;
+                startButton.textContent = '🚀 데이터 수집 시작';
+                progressContainer.style.display = 'none';
+                progressFill.style.width = '0%';
+            }
+        });
+
+        clearLogBtn.addEventListener('click', () => {
+            logContainer.innerHTML = '<div class="log-entry info">로그가 지워졌습니다.</div>';
+        });
+
+        // IPC 메시지 리스너
+        ipcRenderer.on('log-message', (event, logData) => {
+            addLogEntry(logData.type, logData.message);
+        });
+
+        // 초기 기본 키워드 추가
+        const defaultKeywords = ['공유오피스', '아임스페이스', '스마트탑오피스', '더스페이스', '스페이스엑스키'];
+        defaultKeywords.forEach(keyword => addKeyword(keyword));
+    </script>
+</body>
+</html>
