@@ -17,7 +17,13 @@ class DataProcessor {
     const deduplicated = [];
 
     for (const item of data) {
-      const key = `${item.name}|${item.roadAddress || item.address}|${item.tel || ''}`;
+      // 더 안전한 중복 제거 키 생성
+      const name = item['상호명'] || item.name || '';
+      const address = item['도로명주소'] || item['지번주소'] || item.roadAddress || item.address || '';
+      const tel = item['전화번호'] || item.tel || '';
+      
+      const key = `${name}|${address}|${tel}`;
+      
       if (!seen.has(key)) {
         seen.add(key);
         deduplicated.push(item);
@@ -34,24 +40,46 @@ class DataProcessor {
    * @returns {Array} - 정제된 데이터
    */
   processData(rawData) {
+    console.log('Processing data, sample item:', rawData[0]);
+    
     return rawData.map(item => {
+      // 네이버 지도 API 응답 구조에 맞게 필드 매핑
       let region = "";
-      if (item.shortAddress && item.shortAddress.length > 0) {
-        region = item.shortAddress[0];
-      } else {
+      
+      // 지역 정보 추출 (우선순위: province > shortAddress > address 파싱)
+      if (item.province && item.district) {
         region = `${item.province} ${item.district}`;
+      } else if (item.shortAddress && item.shortAddress.length > 0) {
+        region = item.shortAddress[0];
+      } else if (item.roadAddress) {
+        // 도로명주소에서 지역 추출
+        const addressParts = item.roadAddress.split(' ');
+        if (addressParts.length >= 2) {
+          region = `${addressParts[0]} ${addressParts[1]}`;
+        }
+      } else if (item.address) {
+        // 지번주소에서 지역 추출
+        const addressParts = item.address.split(' ');
+        if (addressParts.length >= 2) {
+          region = `${addressParts[0]} ${addressParts[1]}`;
+        }
       }
 
       return {
-        "지역": region,
-        "키워드": item.keyword || '',
-        "상호명": item.name || '',
-        "전화번호": this.formatPhoneNumber(item.tel),
+        "지역": region || '미분류',
+        "키워드": item.keyword || item.searchKeyword || '',
+        "상호명": item.name || item.title || '',
+        "전화번호": this.formatPhoneNumber(item.tel || item.phone),
         "지번주소": item.address || '',
-        "도로명주소": item.roadAddress || '',
-        "가격정보": this.extractPriceInfo(item.menuInfo),
-        "홈페이지": item.homePage || '',
-        "수집일시": new Date().toISOString().split('T')[0]
+        "도로명주소": item.roadAddress || item.road_address || '',
+        "가격정보": this.extractPriceInfo(item.menuInfo || item.description),
+        "홈페이지": item.homePage || item.homepage || item.url || '',
+        "카테고리": item.category || item.bizhourInfo || '',
+        "평점": item.ratings || item.rating || '',
+        "리뷰수": item.reviewCount || '',
+        "영업시간": this.formatBusinessHours(item.bizhourInfo),
+        "수집일시": new Date().toISOString().split('T')[0],
+        "검색쿼리": item.searchQuery || ''
       };
     });
   }
@@ -67,6 +95,8 @@ class DataProcessor {
     // 숫자만 추출
     const numbers = tel.replace(/[^0-9]/g, '');
     
+    if (numbers.length === 0) return '';
+    
     // 일반적인 전화번호 형식으로 변환
     if (numbers.length === 11 && numbers.startsWith('010')) {
       return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
@@ -74,9 +104,23 @@ class DataProcessor {
       return `${numbers.slice(0, 3)}-${numbers.slice(3, 6)}-${numbers.slice(6)}`;
     } else if (numbers.length === 8) {
       return `${numbers.slice(0, 4)}-${numbers.slice(4)}`;
+    } else if (numbers.length === 9) {
+      return `${numbers.slice(0, 2)}-${numbers.slice(2, 5)}-${numbers.slice(5)}`;
     }
     
     return tel;
+  }
+
+  /**
+   * 영업시간 정보 포맷팅
+   * @param {string} bizhourInfo - 영업시간 정보
+   * @returns {string} - 포맷팅된 영업시간
+   */
+  formatBusinessHours(bizhourInfo) {
+    if (!bizhourInfo) return '';
+    
+    // 줄바꿈을 공백으로 변경하고 길이 제한
+    return bizhourInfo.replace(/\n/g, ' ').slice(0, 100);
   }
 
   /**
@@ -115,7 +159,12 @@ class DataProcessor {
         { wch: 40 }, // 도로명주소
         { wch: 30 }, // 가격정보
         { wch: 30 }, // 홈페이지
-        { wch: 12 }  // 수집일시
+        { wch: 15 }, // 카테고리
+        { wch: 10 }, // 평점
+        { wch: 10 }, // 리뷰수
+        { wch: 25 }, // 영업시간
+        { wch: 12 }, // 수집일시
+        { wch: 25 }  // 검색쿼리
       ];
       worksheet['!cols'] = columnWidths;
       
@@ -187,13 +236,14 @@ class DataProcessor {
 
     const requiredFields = ['상호명'];
     const missingFieldsItems = data.filter(item => 
-      requiredFields.some(field => !item[field])
+      requiredFields.some(field => !item[field] || item[field].trim() === '')
     );
 
     if (missingFieldsItems.length > 0) {
+      console.log('Missing fields items sample:', missingFieldsItems.slice(0, 3));
       return { 
         valid: false, 
-        message: `${missingFieldsItems.length}개 항목에 필수 필드가 누락되었습니다.` 
+        message: `${missingFieldsItems.length}개 항목에 필수 필드(상호명)가 누락되었습니다.` 
       };
     }
 
@@ -222,6 +272,9 @@ class DataProcessor {
       });
       
       return cleaned;
+    }).filter(item => {
+      // 상호명이 비어있는 항목 제거
+      return item['상호명'] && item['상호명'].trim() !== '';
     });
   }
 }
