@@ -259,13 +259,33 @@ ipcMain.handle('start-scraping', async (event, keywords) => {
       }
     );
 
+    sendLogMessage('info', `원본 데이터 수집 완료: ${rawData.length}개`);
+    console.log('Raw data sample:', rawData.slice(0, 2)); // 디버깅용
+
+    if (rawData.length === 0) {
+      throw new Error('수집된 데이터가 없습니다.');
+    }
+
     sendLogMessage('info', '데이터 정제 중...');
     sendProgress(95, '데이터 정제 중...');
 
     // 데이터 정제 및 처리
     const processedData = dataProcessor.processData(rawData);
+    sendLogMessage('info', `데이터 처리 완료: ${processedData.length}개`);
+    console.log('Processed data sample:', processedData.slice(0, 2)); // 디버깅용
+
     const deduplicatedData = dataProcessor.deduplicateData(processedData);
+    sendLogMessage('info', `중복 제거 완료: ${deduplicatedData.length}개`);
+    console.log('Deduplicated data sample:', deduplicatedData.slice(0, 2)); // 디버깅용
+
     const cleanedData = dataProcessor.cleanData(deduplicatedData);
+    sendLogMessage('info', `데이터 정리 완료: ${cleanedData.length}개`);
+    console.log('Cleaned data sample:', cleanedData.slice(0, 2)); // 디버깅용
+
+    // 데이터 검증
+    if (cleanedData.length === 0) {
+      throw new Error('데이터 처리 후 유효한 데이터가 없습니다.');
+    }
 
     // 통계 계산
     const statistics = calculateStatistics(cleanedData);
@@ -282,6 +302,7 @@ ipcMain.handle('start-scraping', async (event, keywords) => {
 
   } catch (error) {
     console.error(`데이터 수집 오류: ${error.message}`);
+    console.error('Error stack:', error.stack);
     sendLogMessage('error', `데이터 수집 실패: ${error.message}`);
     return {
       success: false,
@@ -296,6 +317,8 @@ ipcMain.handle('start-scraping', async (event, keywords) => {
 ipcMain.handle('save-data', async (event, data, filePath) => {
   try {
     sendLogMessage('info', `데이터를 저장 중입니다: ${filePath}`);
+    console.log(`저장할 데이터 개수: ${data.length}`);
+    console.log('저장할 데이터 샘플:', data.slice(0, 2));
 
     // 데이터 유효성 검사
     const validation = dataProcessor.validateData(data);
@@ -311,6 +334,7 @@ ipcMain.handle('save-data', async (event, data, filePath) => {
 
   } catch (error) {
     console.error(`데이터 저장 오류: ${error.message}`);
+    console.error('Error stack:', error.stack);
     sendLogMessage('error', `데이터 저장 실패: ${error.message}`);
     return {
       success: false,
