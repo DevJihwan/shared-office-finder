@@ -193,13 +193,16 @@ function calculateStatistics(data) {
     regionStats: {}
   };
 
-  // 지역별 통계
+  // 지역별 통계 (지역 + 지역구 조합으로 계산)
   data.forEach(item => {
     const region = item['지역'] || 'Unknown';
-    if (!stats.regionStats[region]) {
-      stats.regionStats[region] = 0;
+    const district = item['지역구'] || '';
+    const fullRegion = district ? `${region} ${district}` : region;
+    
+    if (!stats.regionStats[fullRegion]) {
+      stats.regionStats[fullRegion] = 0;
     }
-    stats.regionStats[region]++;
+    stats.regionStats[fullRegion]++;
   });
 
   return stats;
