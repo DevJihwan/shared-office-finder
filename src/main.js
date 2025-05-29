@@ -7,6 +7,19 @@ const NaverMapScraper = require('./scrapers/naverMapScraper');
 const dataProcessor = require('./utils/dataProcessor');
 const { regions, defaultKeywords } = require('./config/regions');
 
+// 기본 제외 키워드 목록
+const defaultExcludeKeywords = [
+  '비상주사무실소호사업자사무실공유오피스등록콜센터',
+  '카페',
+  '부동산',
+  '공인중개사사무소',
+  '창업센터',
+  '파티룸',
+  '연습실',
+  '세미나',
+  '패스트파이브'
+];
+
 let mainWindow;
 let scraper;
 
@@ -185,11 +198,12 @@ function sendProgress(progress, status) {
 /**
  * 수집 통계 계산
  */
-function calculateStatistics(data) {
+function calculateStatistics(data, excludedCount = 0) {
   const stats = {
     totalCount: data.length,
     withPhoneNumber: data.filter(item => item['전화번호'] && item['전화번호'].trim()).length,
     withWebsite: data.filter(item => item['홈페이지'] && item['홈페이지'].trim()).length,
+    excludedCount: excludedCount,
     regionStats: {}
   };
 
@@ -243,11 +257,26 @@ ipcMain.handle('get-default-keywords', async () => {
 });
 
 /**
+ * 기본 제외 키워드 반환
+ */
+ipcMain.handle('get-default-exclude-keywords', async () => {
+  try {
+    return defaultExcludeKeywords;
+  } catch (error) {
+    console.error(`기본 제외 키워드 로드 오류: ${error.message}`);
+    return ['카페', '부동산'];
+  }
+});
+
+/**
  * 데이터 수집 시작
  */
-ipcMain.handle('start-scraping', async (event, keywords) => {
+ipcMain.handle('start-scraping', async (event, keywords, excludeKeywords = []) => {
   try {
     sendLogMessage('info', `데이터 수집을 시작합니다. 키워드: ${keywords.join(', ')}`);
+    if (excludeKeywords.length > 0) {
+      sendLogMessage('info', `제외 키워드: ${excludeKeywords.join(', ')}`);
+    }
     sendProgress(0, '데이터 수집 준비 중...');
 
     // 모든 데이터 수집
@@ -281,7 +310,11 @@ ipcMain.handle('start-scraping', async (event, keywords) => {
     sendLogMessage('info', `중복 제거 완료: ${deduplicatedData.length}개`);
     console.log('Deduplicated data sample:', deduplicatedData.slice(0, 2)); // 디버깅용
 
-    const cleanedData = dataProcessor.cleanData(deduplicatedData);
+    // 제외 키워드 필터링 적용
+    const { filteredData, excludedCount } = dataProcessor.filterByExcludeKeywords(deduplicatedData, excludeKeywords);
+    sendLogMessage('info', `제외 키워드 필터링 완료: ${filteredData.length}개 (제외: ${excludedCount}개)`);
+
+    const cleanedData = dataProcessor.cleanData(filteredData);
     sendLogMessage('info', `데이터 정리 완료: ${cleanedData.length}개`);
     console.log('Cleaned data sample:', cleanedData.slice(0, 2)); // 디버깅용
 
@@ -290,8 +323,8 @@ ipcMain.handle('start-scraping', async (event, keywords) => {
       throw new Error('데이터 처리 후 유효한 데이터가 없습니다.');
     }
 
-    // 통계 계산
-    const statistics = calculateStatistics(cleanedData);
+    // 통계 계산 (제외된 데이터 수 포함)
+    const statistics = calculateStatistics(cleanedData, excludedCount);
 
     sendProgress(100, '데이터 수집 완료!');
     sendLogMessage('success', `데이터 수집이 완료되었습니다. 총 ${cleanedData.length}개의 데이터를 수집했습니다.`);
