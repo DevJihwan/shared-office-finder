@@ -52,6 +52,8 @@
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(10px);
             height: fit-content;
+            max-height: 80vh;
+            overflow-y: auto;
         }
 
         .control-panel h2 {
@@ -77,6 +79,15 @@
             border-radius: 10px;
             padding: 15px;
             border: 2px solid #e9ecef;
+            margin-bottom: 15px;
+        }
+
+        .exclude-keywords-container {
+            background: #fff5f5;
+            border-radius: 10px;
+            padding: 15px;
+            border: 2px solid #fed7d7;
+            margin-bottom: 15px;
         }
 
         .keyword-input-group {
@@ -108,6 +119,21 @@
             background: #2980b9;
         }
 
+        .add-exclude-keyword-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .add-exclude-keyword-btn:hover {
+            background: #c0392b;
+        }
+
         .keyword-list {
             display: flex;
             flex-wrap: wrap;
@@ -128,12 +154,24 @@
             animation: fadeIn 0.3s ease-in;
         }
 
+        .exclude-keyword-tag {
+            background: #e74c3c;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            animation: fadeIn 0.3s ease-in;
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: scale(0.8); }
             to { opacity: 1; transform: scale(1); }
         }
 
-        .keyword-tag .remove {
+        .keyword-tag .remove, .exclude-keyword-tag .remove {
             cursor: pointer;
             background: rgba(255, 255, 255, 0.3);
             border-radius: 50%;
@@ -146,7 +184,7 @@
             transition: background 0.2s;
         }
 
-        .keyword-tag .remove:hover {
+        .keyword-tag .remove:hover, .exclude-keyword-tag .remove:hover {
             background: rgba(255, 255, 255, 0.5);
         }
 
@@ -368,6 +406,22 @@
             transform: scale(1.05);
         }
 
+        .default-exclude-keyword-btn {
+            background: #ffeaa7;
+            border: 1px solid #fdcb6e;
+            padding: 4px 8px;
+            margin: 2px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+
+        .default-exclude-keyword-btn:hover {
+            background: #ffeaa7;
+            transform: scale(1.05);
+        }
+
         .statistics-panel {
             margin-top: 20px;
             background: #f8f9fa;
@@ -449,6 +503,30 @@
                 </div>
             </div>
 
+            <div class="form-group">
+                <label>제외 키워드</label>
+                <div class="exclude-keywords-container">
+                    <div class="keyword-input-group">
+                        <input type="text" id="excludeKeywordInput" class="keyword-input" 
+                               placeholder="제외할 키워드를 입력하세요" maxlength="30">
+                        <button id="addExcludeKeywordBtn" class="add-exclude-keyword-btn">추가</button>
+                    </div>
+                    <div id="excludeKeywordList" class="keyword-list"></div>
+                    
+                    <div class="default-keywords">
+                        <div class="default-keywords-label">기본 제외 키워드:</div>
+                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('카페')">카페</button>
+                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('부동산')">부동산</button>
+                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('공인중개사사무소')">공인중개사</button>
+                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('창업센터')">창업센터</button>
+                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('파티룸')">파티룸</button>
+                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('연습실')">연습실</button>
+                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('세미나')">세미나</button>
+                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('패스트파이브')">패스트파이브</button>
+                    </div>
+                </div>
+            </div>
+
             <button id="startButton" class="start-button">🚀 데이터 수집 시작</button>
             <button id="saveButton" class="save-button">💾 데이터 저장</button>
             
@@ -480,6 +558,10 @@
                     <span>수집 지역 수:</span>
                     <span id="regionCount" class="stat-value">0</span>
                 </div>
+                <div class="stat-item">
+                    <span>제외된 데이터:</span>
+                    <span id="excludedCount" class="stat-value">0</span>
+                </div>
             </div>
         </div>
 
@@ -501,6 +583,7 @@
         const { ipcRenderer } = require('electron');
         
         let keywords = [];
+        let excludeKeywords = [];
         let isScrapingInProgress = false;
         let collectedData = null;
         let logMessages = [];
@@ -509,6 +592,11 @@
         const keywordInput = document.getElementById('keywordInput');
         const addKeywordBtn = document.getElementById('addKeywordBtn');
         const keywordList = document.getElementById('keywordList');
+        
+        const excludeKeywordInput = document.getElementById('excludeKeywordInput');
+        const addExcludeKeywordBtn = document.getElementById('addExcludeKeywordBtn');
+        const excludeKeywordList = document.getElementById('excludeKeywordList');
+        
         const startButton = document.getElementById('startButton');
         const saveButton = document.getElementById('saveButton');
         const logContainer = document.getElementById('logContainer');
@@ -555,6 +643,30 @@
             showNotification('success', `키워드 "${keyword}"가 추가되었습니다.`);
         }
 
+        // 제외 키워드 추가 함수
+        function addExcludeKeyword(keyword) {
+            if (!keyword.trim()) {
+                showNotification('warning', '제외 키워드를 입력해주세요.');
+                return;
+            }
+            
+            keyword = keyword.trim();
+            if (excludeKeywords.includes(keyword)) {
+                showNotification('warning', `"${keyword}"는 이미 추가된 제외 키워드입니다.`);
+                return;
+            }
+            
+            if (excludeKeywords.length >= 20) {
+                showNotification('warning', '제외 키워드는 최대 20개까지 추가할 수 있습니다.');
+                return;
+            }
+            
+            excludeKeywords.push(keyword);
+            updateExcludeKeywordList();
+            addLogEntry('info', `제외 키워드 "${keyword}"가 추가되었습니다.`);
+            showNotification('success', `제외 키워드 "${keyword}"가 추가되었습니다.`);
+        }
+
         // 키워드 목록 업데이트
         function updateKeywordList() {
             keywordList.innerHTML = '';
@@ -569,6 +681,20 @@
             });
         }
 
+        // 제외 키워드 목록 업데이트
+        function updateExcludeKeywordList() {
+            excludeKeywordList.innerHTML = '';
+            excludeKeywords.forEach((keyword, index) => {
+                const tag = document.createElement('div');
+                tag.className = 'exclude-keyword-tag';
+                tag.innerHTML = `
+                    <span>${keyword}</span>
+                    <span class="remove" onclick="removeExcludeKeyword(${index})" title="제거">×</span>
+                `;
+                excludeKeywordList.appendChild(tag);
+            });
+        }
+
         // 키워드 제거
         function removeKeyword(index) {
             const removedKeyword = keywords[index];
@@ -578,9 +704,23 @@
             showNotification('info', `키워드 "${removedKeyword}"가 제거되었습니다.`);
         }
 
+        // 제외 키워드 제거
+        function removeExcludeKeyword(index) {
+            const removedKeyword = excludeKeywords[index];
+            excludeKeywords.splice(index, 1);
+            updateExcludeKeywordList();
+            addLogEntry('info', `제외 키워드 "${removedKeyword}"가 제거되었습니다.`);
+            showNotification('info', `제외 키워드 "${removedKeyword}"가 제거되었습니다.`);
+        }
+
         // 기본 키워드 추가
         function addDefaultKeyword(keyword) {
             addKeyword(keyword);
+        }
+
+        // 기본 제외 키워드 추가
+        function addDefaultExcludeKeyword(keyword) {
+            addExcludeKeyword(keyword);
         }
 
         // 로그 엔트리 추가
@@ -616,6 +756,8 @@
                 `${((stats.withWebsite / stats.totalCount) * 100).toFixed(1)}%`;
             document.getElementById('regionCount').textContent = 
                 Object.keys(stats.regionStats).length.toLocaleString();
+            document.getElementById('excludedCount').textContent = 
+                (stats.excludedCount || 0).toLocaleString();
             
             statisticsPanel.style.display = 'block';
         }
@@ -630,6 +772,18 @@
             if (e.key === 'Enter') {
                 addKeyword(keywordInput.value);
                 keywordInput.value = '';
+            }
+        });
+
+        addExcludeKeywordBtn.addEventListener('click', () => {
+            addExcludeKeyword(excludeKeywordInput.value);
+            excludeKeywordInput.value = '';
+        });
+
+        excludeKeywordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addExcludeKeyword(excludeKeywordInput.value);
+                excludeKeywordInput.value = '';
             }
         });
 
@@ -652,7 +806,7 @@
             statisticsPanel.style.display = 'none';
             
             try {
-                const result = await ipcRenderer.invoke('start-scraping', keywords);
+                const result = await ipcRenderer.invoke('start-scraping', keywords, excludeKeywords);
                 
                 if (result.success) {
                     collectedData = result.data;
@@ -754,7 +908,9 @@
         ipcRenderer.on('menu-new-collection', () => {
             if (!isScrapingInProgress) {
                 keywords = [];
+                excludeKeywords = [];
                 updateKeywordList();
+                updateExcludeKeywordList();
                 collectedData = null;
                 saveButton.style.display = 'none';
                 statisticsPanel.style.display = 'none';
@@ -776,6 +932,10 @@
             try {
                 const defaultKeywords = await ipcRenderer.invoke('get-default-keywords');
                 defaultKeywords.forEach(keyword => addKeyword(keyword));
+                
+                // 기본 제외 키워드 추가
+                const defaultExcludeKeywords = await ipcRenderer.invoke('get-default-exclude-keywords');
+                defaultExcludeKeywords.forEach(keyword => addExcludeKeyword(keyword));
                 
                 addLogEntry('success', '프로그램이 성공적으로 초기화되었습니다.');
             } catch (error) {
