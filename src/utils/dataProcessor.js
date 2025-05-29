@@ -35,6 +35,40 @@ class DataProcessor {
   }
 
   /**
+   * 제외 키워드로 데이터 필터링
+   * @param {Array} data - 필터링할 데이터
+   * @param {Array} excludeKeywords - 제외 키워드 목록
+   * @returns {Object} - {filteredData: 필터링된 데이터, excludedCount: 제외된 데이터 수}
+   */
+  filterByExcludeKeywords(data, excludeKeywords = []) {
+    if (excludeKeywords.length === 0) {
+      return { filteredData: data, excludedCount: 0 };
+    }
+
+    const filteredData = [];
+    let excludedCount = 0;
+
+    for (const item of data) {
+      const businessName = (item['상호명'] || '').toLowerCase();
+      
+      // 제외 키워드가 상호명에 포함되어 있는지 확인
+      const shouldExclude = excludeKeywords.some(keyword => 
+        businessName.includes(keyword.toLowerCase())
+      );
+
+      if (shouldExclude) {
+        excludedCount++;
+        console.log(`제외된 데이터: ${item['상호명']} (제외 키워드 포함)`);
+      } else {
+        filteredData.push(item);
+      }
+    }
+
+    console.log(`제외 키워드 필터링: ${data.length}개 → ${filteredData.length}개 (${excludedCount}개 제외)`);
+    return { filteredData, excludedCount };
+  }
+
+  /**
    * 지역 정보를 지역과 지역구로 분리
    * @param {Object} item - 데이터 아이템
    * @returns {Object} - {region: '서울특별시', district: '종로구'}
