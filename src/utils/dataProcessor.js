@@ -35,6 +35,57 @@ class DataProcessor {
   }
 
   /**
+   * 지역 정보를 지역과 지역구로 분리
+   * @param {Object} item - 데이터 아이템
+   * @returns {Object} - {region: '서울특별시', district: '종로구'}
+   */
+  parseRegionInfo(item) {
+    let region = '';
+    let district = '';
+
+    // 지역 정보 추출 (우선순위: province > shortAddress > address 파싱)
+    if (item.province && item.district) {
+      region = item.province;
+      district = item.district;
+    } else if (item.shortAddress && item.shortAddress.length > 0) {
+      const fullRegion = item.shortAddress[0];
+      const regionParts = fullRegion.split(' ');
+      if (regionParts.length >= 2) {
+        region = regionParts[0];
+        district = regionParts[1];
+      } else {
+        region = fullRegion;
+        district = '';
+      }
+    } else if (item.roadAddress) {
+      // 도로명주소에서 지역 추출
+      const addressParts = item.roadAddress.split(' ');
+      if (addressParts.length >= 2) {
+        region = addressParts[0];
+        district = addressParts[1];
+      } else if (addressParts.length === 1) {
+        region = addressParts[0];
+        district = '';
+      }
+    } else if (item.address) {
+      // 지번주소에서 지역 추출
+      const addressParts = item.address.split(' ');
+      if (addressParts.length >= 2) {
+        region = addressParts[0];
+        district = addressParts[1];
+      } else if (addressParts.length === 1) {
+        region = addressParts[0];
+        district = '';
+      }
+    }
+
+    return {
+      region: region || '미분류',
+      district: district || '미분류'
+    };
+  }
+
+  /**
    * 데이터 정제 및 표준화
    * @param {Array} rawData - 원본 데이터
    * @returns {Array} - 정제된 데이터
@@ -43,42 +94,21 @@ class DataProcessor {
     console.log('Processing data, sample item:', rawData[0]);
     
     return rawData.map(item => {
-      // 네이버 지도 API 응답 구조에 맞게 필드 매핑
-      let region = "";
-      
-      // 지역 정보 추출 (우선순위: province > shortAddress > address 파싱)
-      if (item.province && item.district) {
-        region = `${item.province} ${item.district}`;
-      } else if (item.shortAddress && item.shortAddress.length > 0) {
-        region = item.shortAddress[0];
-      } else if (item.roadAddress) {
-        // 도로명주소에서 지역 추출
-        const addressParts = item.roadAddress.split(' ');
-        if (addressParts.length >= 2) {
-          region = `${addressParts[0]} ${addressParts[1]}`;
-        }
-      } else if (item.address) {
-        // 지번주소에서 지역 추출
-        const addressParts = item.address.split(' ');
-        if (addressParts.length >= 2) {
-          region = `${addressParts[0]} ${addressParts[1]}`;
-        }
-      }
+      // 지역 정보 분리
+      const regionInfo = this.parseRegionInfo(item);
 
+      // 요청된 순서대로 컬럼 구성
       return {
-        "지역": region || '미분류',
-        "키워드": item.keyword || item.searchKeyword || '',
+        "지역": regionInfo.region,
+        "지역구": regionInfo.district,
         "상호명": item.name || item.title || '',
         "전화번호": this.formatPhoneNumber(item.tel || item.phone),
         "지번주소": item.address || '',
         "도로명주소": item.roadAddress || item.road_address || '',
-        "가격정보": this.extractPriceInfo(item.menuInfo || item.description),
         "홈페이지": item.homePage || item.homepage || item.url || '',
-        "카테고리": item.category || item.bizhourInfo || '',
-        "평점": item.ratings || item.rating || '',
-        "리뷰수": item.reviewCount || '',
-        "영업시간": this.formatBusinessHours(item.bizhourInfo),
+        "가격정보": this.extractPriceInfo(item.menuInfo || item.description),
         "수집일시": new Date().toISOString().split('T')[0],
+        "키워드": item.keyword || item.searchKeyword || '',
         "검색쿼리": item.searchQuery || ''
       };
     });
@@ -112,18 +142,6 @@ class DataProcessor {
   }
 
   /**
-   * 영업시간 정보 포맷팅
-   * @param {string} bizhourInfo - 영업시간 정보
-   * @returns {string} - 포맷팅된 영업시간
-   */
-  formatBusinessHours(bizhourInfo) {
-    if (!bizhourInfo) return '';
-    
-    // 줄바꿈을 공백으로 변경하고 길이 제한
-    return bizhourInfo.replace(/\n/g, ' ').slice(0, 100);
-  }
-
-  /**
    * 가격 정보 추출
    * @param {string} menuInfo - 메뉴 정보
    * @returns {string} - 정제된 가격 정보
@@ -149,21 +167,18 @@ class DataProcessor {
     try {
       const worksheet = XLSX.utils.json_to_sheet(data);
       
-      // 컬럼 너비 설정
+      // 새로운 컬럼 순서에 맞게 컬럼 너비 설정
       const columnWidths = [
         { wch: 15 }, // 지역
-        { wch: 15 }, // 키워드
+        { wch: 15 }, // 지역구
         { wch: 25 }, // 상호명
         { wch: 15 }, // 전화번호
         { wch: 40 }, // 지번주소
         { wch: 40 }, // 도로명주소
-        { wch: 30 }, // 가격정보
         { wch: 30 }, // 홈페이지
-        { wch: 15 }, // 카테고리
-        { wch: 10 }, // 평점
-        { wch: 10 }, // 리뷰수
-        { wch: 25 }, // 영업시간
+        { wch: 30 }, // 가격정보
         { wch: 12 }, // 수집일시
+        { wch: 15 }, // 키워드
         { wch: 25 }  // 검색쿼리
       ];
       worksheet['!cols'] = columnWidths;
