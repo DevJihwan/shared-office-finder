@@ -45,8 +45,8 @@ function createWindow() {
   // 메뉴 설정
   createMenu();
 
-  // HTML 파일 로드
-  mainWindow.loadFile('src/index.html');
+  // HTML 파일 로드 (main.js가 src 폴더에 있으므로 상대경로로 index.html)
+  mainWindow.loadFile('index.html');
 
   // 윈도우가 준비되면 표시
   mainWindow.once('ready-to-show', () => {
