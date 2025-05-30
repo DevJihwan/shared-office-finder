@@ -5,7 +5,7 @@ const fs = require('fs');
 // 필요한 모듈들 import
 const NaverMapScraper = require('./scrapers/naverMapScraper');
 const dataProcessor = require('./utils/dataProcessor');
-const { regions, defaultKeywords } = require('./config/regions');
+const { regions, defaultKeywords, defaultSelectedRegions } = require('./config/regions');
 
 // 기본 제외 키워드 목록
 const defaultExcludeKeywords = [
@@ -41,7 +41,8 @@ function loadUserSettings() {
   }
   return {
     removedDefaultKeywords: [],
-    removedDefaultExcludeKeywords: []
+    removedDefaultExcludeKeywords: [],
+    selectedRegions: defaultSelectedRegions
   };
 }
 
@@ -51,7 +52,7 @@ function loadUserSettings() {
 function saveUserSettings(settings) {
   try {
     // userData 디렉토리가 없으면 생성
-    if (!fs.existsSync(userDataPath)) {
+    if (!fs.existsExists(userDataPath)) {
       fs.mkdirSync(userDataPath, { recursive: true });
     }
     fs.writeFileSync(userSettingsPath, JSON.stringify(settings, null, 2));
@@ -67,10 +68,10 @@ function saveUserSettings(settings) {
  */
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 1000,
-    minHeight: 600,
+    width: 1400,
+    height: 900,
+    minWidth: 1200,
+    minHeight: 700,
     title: '공유오피스 데이터 수집기',
     webPreferences: {
       nodeIntegration: true,
@@ -323,6 +324,52 @@ app.on('activate', () => {
 // IPC 핸들러들
 
 /**
+ * 전체 지역 목록 반환
+ */
+ipcMain.handle('get-regions', async () => {
+  try {
+    return regions;
+  } catch (error) {
+    console.error(`지역 목록 로드 오류: ${error.message}`);
+    return [];
+  }
+});
+
+/**
+ * 사용자가 선택한 지역 목록 반환
+ */
+ipcMain.handle('get-selected-regions', async () => {
+  try {
+    const userSettings = loadUserSettings();
+    return userSettings.selectedRegions || defaultSelectedRegions;
+  } catch (error) {
+    console.error(`선택된 지역 로드 오류: ${error.message}`);
+    return defaultSelectedRegions;
+  }
+});
+
+/**
+ * 사용자가 선택한 지역 목록 저장
+ */
+ipcMain.handle('save-selected-regions', async (event, selectedRegions) => {
+  try {
+    const userSettings = loadUserSettings();
+    userSettings.selectedRegions = selectedRegions;
+    const success = saveUserSettings(userSettings);
+    
+    if (success) {
+      console.log('선택된 지역이 저장되었습니다:', selectedRegions);
+      return { success: true };
+    } else {
+      return { success: false, error: '설정 저장 실패' };
+    }
+  } catch (error) {
+    console.error(`선택된 지역 저장 오류: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
  * 기본 키워드 반환 (사용자가 삭제한 키워드 제외)
  */
 ipcMain.handle('get-default-keywords', async () => {
@@ -437,17 +484,27 @@ ipcMain.handle('remove-default-exclude-keyword', async (event, keyword) => {
 /**
  * 데이터 수집 시작
  */
-ipcMain.handle('start-scraping', async (event, keywords, excludeKeywords = []) => {
+ipcMain.handle('start-scraping', async (event, keywords, excludeKeywords = [], selectedRegionNames = []) => {
   try {
     sendLogMessage('info', `데이터 수집을 시작합니다. 키워드: ${keywords.join(', ')}`);
     if (excludeKeywords.length > 0) {
       sendLogMessage('info', `제외 키워드: ${excludeKeywords.join(', ')}`);
     }
+    
+    // 선택된 지역만 필터링
+    let targetRegions = regions;
+    if (selectedRegionNames && selectedRegionNames.length > 0) {
+      targetRegions = regions.filter(region => selectedRegionNames.includes(region.province));
+      sendLogMessage('info', `선택된 지역: ${selectedRegionNames.join(', ')}`);
+    } else {
+      sendLogMessage('warning', '선택된 지역이 없습니다. 전체 지역에서 수집합니다.');
+    }
+    
     sendProgress(0, '데이터 수집 준비 중...');
 
     // 모든 데이터 수집
     const rawData = await scraper.collectAllData(
-      regions,
+      targetRegions,
       keywords,
       (progress, status) => {
         sendProgress(progress, status);
