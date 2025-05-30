@@ -23,6 +23,45 @@ const defaultExcludeKeywords = [
 let mainWindow;
 let scraper;
 
+// 사용자 설정 파일 경로
+const userDataPath = app.getPath('userData');
+const userSettingsPath = path.join(userDataPath, 'user-settings.json');
+
+/**
+ * 사용자 설정 로드
+ */
+function loadUserSettings() {
+  try {
+    if (fs.existsSync(userSettingsPath)) {
+      const data = fs.readFileSync(userSettingsPath, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('사용자 설정 로드 오류:', error);
+  }
+  return {
+    removedDefaultKeywords: [],
+    removedDefaultExcludeKeywords: []
+  };
+}
+
+/**
+ * 사용자 설정 저장
+ */
+function saveUserSettings(settings) {
+  try {
+    // userData 디렉토리가 없으면 생성
+    if (!fs.existsSync(userDataPath)) {
+      fs.mkdirSync(userDataPath, { recursive: true });
+    }
+    fs.writeFileSync(userSettingsPath, JSON.stringify(settings, null, 2));
+    return true;
+  } catch (error) {
+    console.error('사용자 설정 저장 오류:', error);
+    return false;
+  }
+}
+
 /**
  * 메인 윈도우 생성
  */
@@ -85,6 +124,13 @@ function createMenu() {
           accelerator: 'CmdOrCtrl+E',
           click: () => {
             mainWindow.webContents.send('menu-export');
+          }
+        },
+        { type: 'separator' },
+        {
+          label: '기본 키워드 초기화',
+          click: () => {
+            resetDefaultKeywords();
           }
         },
         { type: 'separator' },
@@ -162,6 +208,38 @@ function createMenu() {
 
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
+}
+
+/**
+ * 기본 키워드 초기화 (메뉴에서 사용)
+ */
+function resetDefaultKeywords() {
+  const result = dialog.showMessageBoxSync(mainWindow, {
+    type: 'question',
+    buttons: ['초기화', '취소'],
+    defaultId: 1,
+    title: '기본 키워드 초기화',
+    message: '기본 키워드를 초기 상태로 되돌리시겠습니까?',
+    detail: '삭제했던 기본 키워드들이 다시 나타납니다.'
+  });
+  
+  if (result === 0) {
+    // 사용자 설정 초기화
+    const settings = loadUserSettings();
+    settings.removedDefaultKeywords = [];
+    settings.removedDefaultExcludeKeywords = [];
+    saveUserSettings(settings);
+    
+    // 화면에 메시지 전송
+    mainWindow.webContents.send('reset-default-keywords');
+    
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: '완료',
+      message: '기본 키워드가 초기화되었습니다.',
+      detail: '프로그램을 다시 시작하면 모든 기본 키워드가 복원됩니다.'
+    });
+  }
 }
 
 /**
@@ -245,11 +323,22 @@ app.on('activate', () => {
 // IPC 핸들러들
 
 /**
- * 기본 키워드 반환
+ * 기본 키워드 반환 (사용자가 삭제한 키워드 제외)
  */
 ipcMain.handle('get-default-keywords', async () => {
   try {
-    return defaultKeywords;
+    const userSettings = loadUserSettings();
+    const removedKeywords = userSettings.removedDefaultKeywords || [];
+    
+    // 삭제된 키워드들을 제외한 기본 키워드만 반환
+    const filteredKeywords = defaultKeywords.filter(
+      keyword => !removedKeywords.includes(keyword)
+    );
+    
+    console.log('로드된 기본 키워드:', filteredKeywords);
+    console.log('제외된 키워드:', removedKeywords);
+    
+    return filteredKeywords;
   } catch (error) {
     console.error(`기본 키워드 로드 오류: ${error.message}`);
     return ['공유오피스', '코워킹스페이스'];
@@ -257,14 +346,91 @@ ipcMain.handle('get-default-keywords', async () => {
 });
 
 /**
- * 기본 제외 키워드 반환
+ * 기본 제외 키워드 반환 (사용자가 삭제한 키워드 제외)
  */
 ipcMain.handle('get-default-exclude-keywords', async () => {
   try {
-    return defaultExcludeKeywords;
+    const userSettings = loadUserSettings();
+    const removedKeywords = userSettings.removedDefaultExcludeKeywords || [];
+    
+    // 삭제된 키워드들을 제외한 기본 제외 키워드만 반환
+    const filteredKeywords = defaultExcludeKeywords.filter(
+      keyword => !removedKeywords.includes(keyword)
+    );
+    
+    console.log('로드된 기본 제외 키워드:', filteredKeywords);
+    console.log('제외된 제외 키워드:', removedKeywords);
+    
+    return filteredKeywords;
   } catch (error) {
     console.error(`기본 제외 키워드 로드 오류: ${error.message}`);
     return ['카페', '부동산'];
+  }
+});
+
+/**
+ * 기본 키워드를 사용자의 삭제 목록에 추가
+ */
+ipcMain.handle('remove-default-keyword', async (event, keyword) => {
+  try {
+    const userSettings = loadUserSettings();
+    
+    // 기본 키워드인지 확인
+    if (defaultKeywords.includes(keyword)) {
+      if (!userSettings.removedDefaultKeywords) {
+        userSettings.removedDefaultKeywords = [];
+      }
+      
+      if (!userSettings.removedDefaultKeywords.includes(keyword)) {
+        userSettings.removedDefaultKeywords.push(keyword);
+        const success = saveUserSettings(userSettings);
+        
+        if (success) {
+          console.log(`기본 키워드 "${keyword}"가 삭제 목록에 추가되었습니다.`);
+          return { success: true };
+        } else {
+          return { success: false, error: '설정 저장 실패' };
+        }
+      }
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error(`기본 키워드 삭제 처리 오류: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * 기본 제외 키워드를 사용자의 삭제 목록에 추가
+ */
+ipcMain.handle('remove-default-exclude-keyword', async (event, keyword) => {
+  try {
+    const userSettings = loadUserSettings();
+    
+    // 기본 제외 키워드인지 확인
+    if (defaultExcludeKeywords.includes(keyword)) {
+      if (!userSettings.removedDefaultExcludeKeywords) {
+        userSettings.removedDefaultExcludeKeywords = [];
+      }
+      
+      if (!userSettings.removedDefaultExcludeKeywords.includes(keyword)) {
+        userSettings.removedDefaultExcludeKeywords.push(keyword);
+        const success = saveUserSettings(userSettings);
+        
+        if (success) {
+          console.log(`기본 제외 키워드 "${keyword}"가 삭제 목록에 추가되었습니다.`);
+          return { success: true };
+        } else {
+          return { success: false, error: '설정 저장 실패' };
+        }
+      }
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error(`기본 제외 키워드 삭제 처리 오류: ${error.message}`);
+    return { success: false, error: error.message };
   }
 });
 

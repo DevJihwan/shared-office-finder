@@ -587,6 +587,10 @@
         let isScrapingInProgress = false;
         let collectedData = null;
         let logMessages = [];
+        
+        // 기본 키워드 목록 (config에서 가져온 것)
+        let originalDefaultKeywords = [];
+        let originalDefaultExcludeKeywords = [];
 
         // DOM 요소들
         const keywordInput = document.getElementById('keywordInput');
@@ -696,18 +700,40 @@
         }
 
         // 키워드 제거
-        function removeKeyword(index) {
+        async function removeKeyword(index) {
             const removedKeyword = keywords[index];
             keywords.splice(index, 1);
+            
+            // 기본 키워드인 경우 삭제 목록에 추가
+            if (originalDefaultKeywords.includes(removedKeyword)) {
+                try {
+                    await ipcRenderer.invoke('remove-default-keyword', removedKeyword);
+                    addLogEntry('info', `기본 키워드 "${removedKeyword}"가 영구적으로 제거되었습니다.`);
+                } catch (error) {
+                    console.error('기본 키워드 삭제 처리 오류:', error);
+                }
+            }
+            
             updateKeywordList();
             addLogEntry('info', `키워드 "${removedKeyword}"가 제거되었습니다.`);
             showNotification('info', `키워드 "${removedKeyword}"가 제거되었습니다.`);
         }
 
         // 제외 키워드 제거
-        function removeExcludeKeyword(index) {
+        async function removeExcludeKeyword(index) {
             const removedKeyword = excludeKeywords[index];
             excludeKeywords.splice(index, 1);
+            
+            // 기본 제외 키워드인 경우 삭제 목록에 추가
+            if (originalDefaultExcludeKeywords.includes(removedKeyword)) {
+                try {
+                    await ipcRenderer.invoke('remove-default-exclude-keyword', removedKeyword);
+                    addLogEntry('info', `기본 제외 키워드 "${removedKeyword}"가 영구적으로 제거되었습니다.`);
+                } catch (error) {
+                    console.error('기본 제외 키워드 삭제 처리 오류:', error);
+                }
+            }
+            
             updateExcludeKeywordList();
             addLogEntry('info', `제외 키워드 "${removedKeyword}"가 제거되었습니다.`);
             showNotification('info', `제외 키워드 "${removedKeyword}"가 제거되었습니다.`);
@@ -916,6 +942,9 @@
                 statisticsPanel.style.display = 'none';
                 addLogEntry('info', '새로운 수집 작업을 시작합니다.');
                 showNotification('info', '새로운 수집 작업을 시작합니다.');
+                
+                // 초기화 시 기본 키워드 다시 로드
+                initialize();
             }
         });
 
@@ -926,20 +955,42 @@
                 showNotification('warning', '내보낼 데이터가 없습니다.');
             }
         });
+        
+        // 기본 키워드 초기화 메시지 수신
+        ipcRenderer.on('reset-default-keywords', () => {
+            keywords = [];
+            excludeKeywords = [];
+            updateKeywordList();
+            updateExcludeKeywordList();
+            addLogEntry('info', '기본 키워드가 초기화되었습니다. 프로그램을 다시 시작하세요.');
+            showNotification('info', '기본 키워드가 초기화되었습니다. 프로그램을 다시 시작하세요.');
+        });
 
-        // 초기화
+        // 초기화 함수
         async function initialize() {
             try {
+                // 원본 기본 키워드 목록 가져오기 (전체 목록)
+                const allDefaultKeywords = ['공유오피스', '아임스페이스', '스마트탑오피스', '더스페이스', '스페이스엑스키'];
+                const allDefaultExcludeKeywords = [
+                    '비상주사무실소호사업자사무실공유오피스등록콜센터',
+                    '카페', '부동산', '공인중개사사무소', '창업센터', '파티룸', '연습실', '세미나', '패스트파이브'
+                ];
+                
+                originalDefaultKeywords = allDefaultKeywords;
+                originalDefaultExcludeKeywords = allDefaultExcludeKeywords;
+                
+                // 삭제되지 않은 기본 키워드만 가져오기
                 const defaultKeywords = await ipcRenderer.invoke('get-default-keywords');
                 defaultKeywords.forEach(keyword => addKeyword(keyword));
                 
-                // 기본 제외 키워드 추가
+                // 삭제되지 않은 기본 제외 키워드만 가져오기
                 const defaultExcludeKeywords = await ipcRenderer.invoke('get-default-exclude-keywords');
                 defaultExcludeKeywords.forEach(keyword => addExcludeKeyword(keyword));
                 
                 addLogEntry('success', '프로그램이 성공적으로 초기화되었습니다.');
             } catch (error) {
                 addLogEntry('error', '초기화 중 오류가 발생했습니다.');
+                console.error('초기화 오류:', error);
             }
         }
 
