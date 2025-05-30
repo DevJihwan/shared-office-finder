@@ -26,7 +26,6 @@
     "files": [
       "src/**/*",
       "index.html",
-      "assets/**/*",
       "!src/**/*.test.js",
       "!**/.DS_Store"
     ],
@@ -37,8 +36,7 @@
           "target": "dmg",
           "arch": ["x64", "arm64"]
         }
-      ],
-      "icon": "assets/icon.icns"
+      ]
     },
     "win": {
       "target": [
@@ -46,8 +44,7 @@
           "target": "nsis",
           "arch": ["x64", "ia32"]
         }
-      ],
-      "icon": "assets/icon.ico"
+      ]
     },
     "linux": {
       "target": [
@@ -60,7 +57,6 @@
           "arch": ["x64"]
         }
       ],
-      "icon": "assets/icon.png",
       "category": "Office"
     },
     "nsis": {
@@ -79,10 +75,7 @@
       "menuCategory": "공유오피스 데이터 수집기",
       "unicode": false
     },
-    "asar": true,
-    "asarUnpack": [
-      "assets/**/*"
-    ]
+    "asar": true
   },
   "dependencies": {
     "axios": "^1.6.8",
