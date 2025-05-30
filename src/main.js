@@ -37,7 +37,6 @@ function createWindow() {
       contextIsolation: false,
       enableRemoteModule: true
     },
-    icon: path.join(__dirname, '../assets/icon.png'),
     show: false, // 준비될 때까지 숨김
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default'
   });
@@ -46,7 +45,7 @@ function createWindow() {
   createMenu();
 
   // HTML 파일 로드
-  mainWindow.loadFile('index.html');
+  mainWindow.loadFile('src/index.html');
 
   // 윈도우가 준비되면 표시
   mainWindow.once('ready-to-show', () => {
