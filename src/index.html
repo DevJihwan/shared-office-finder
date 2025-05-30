@@ -39,20 +39,20 @@
             display: flex;
             gap: 20px;
             padding: 20px;
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             width: 100%;
         }
 
         .control-panel {
-            width: 380px;
+            width: 450px;
             background: rgba(255, 255, 255, 0.95);
             border-radius: 15px;
             padding: 25px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(10px);
             height: fit-content;
-            max-height: 80vh;
+            max-height: 85vh;
             overflow-y: auto;
         }
 
@@ -87,6 +87,14 @@
             border-radius: 10px;
             padding: 15px;
             border: 2px solid #fed7d7;
+            margin-bottom: 15px;
+        }
+
+        .regions-container {
+            background: #f0fff4;
+            border-radius: 10px;
+            padding: 15px;
+            border: 2px solid #c6f6d5;
             margin-bottom: 15px;
         }
 
@@ -186,6 +194,92 @@
 
         .keyword-tag .remove:hover, .exclude-keyword-tag .remove:hover {
             background: rgba(255, 255, 255, 0.5);
+        }
+
+        .regions-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .regions-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .select-all-btn, .deselect-all-btn {
+            background: #48bb78;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+
+        .select-all-btn:hover {
+            background: #38a169;
+        }
+
+        .deselect-all-btn {
+            background: #e53e3e;
+        }
+
+        .deselect-all-btn:hover {
+            background: #c53030;
+        }
+
+        .regions-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px;
+            background: white;
+        }
+
+        .region-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .region-item:hover {
+            background: #f7fafc;
+        }
+
+        .region-checkbox {
+            margin-right: 8px;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .region-label {
+            font-size: 14px;
+            color: #2d3748;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .region-count {
+            font-size: 12px;
+            color: #718096;
+            margin-left: auto;
+        }
+
+        .selected-regions-info {
+            margin-top: 10px;
+            padding: 8px;
+            background: #e6fffa;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #065f46;
         }
 
         .start-button {
@@ -544,6 +638,25 @@
                 </div>
             </div>
 
+            <div class="form-group">
+                <label>🗺️ 수집 지역</label>
+                <div class="regions-container">
+                    <div class="regions-header">
+                        <span style="font-weight: 500; color: #2d3748;">지역 선택</span>
+                        <div class="regions-controls">
+                            <button id="selectAllRegionsBtn" class="select-all-btn">전체 선택</button>
+                            <button id="deselectAllRegionsBtn" class="deselect-all-btn">전체 해제</button>
+                        </div>
+                    </div>
+                    <div id="regionsList" class="regions-list">
+                        <!-- 지역 체크박스들이 동적으로 생성됩니다 -->
+                    </div>
+                    <div id="selectedRegionsInfo" class="selected-regions-info">
+                        선택된 지역: 0개
+                    </div>
+                </div>
+            </div>
+
             <button id="startButton" class="start-button">🚀 데이터 수집 시작</button>
             <button id="saveButton" class="save-button">💾 데이터 저장</button>
             
@@ -601,6 +714,8 @@
         
         let keywords = [];
         let excludeKeywords = [];
+        let selectedRegions = [];
+        let allRegions = [];
         let isScrapingInProgress = false;
         let collectedData = null;
         let logMessages = [];
@@ -634,6 +749,10 @@
         // 새로 추가된 DOM 요소들
         const defaultKeywordBtns = document.getElementById('defaultKeywordBtns');
         const defaultExcludeKeywordBtns = document.getElementById('defaultExcludeKeywordBtns');
+        const regionsList = document.getElementById('regionsList');
+        const selectedRegionsInfo = document.getElementById('selectedRegionsInfo');
+        const selectAllRegionsBtn = document.getElementById('selectAllRegionsBtn');
+        const deselectAllRegionsBtn = document.getElementById('deselectAllRegionsBtn');
 
         // 알림 표시 함수
         function showNotification(type, message) {
@@ -644,6 +763,95 @@
             setTimeout(() => {
                 notification.classList.remove('show');
             }, 3000);
+        }
+
+        // 지역 목록 업데이트
+        function updateRegionsList() {
+            regionsList.innerHTML = '';
+            
+            allRegions.forEach((region, index) => {
+                const regionItem = document.createElement('div');
+                regionItem.className = 'region-item';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'region-checkbox';
+                checkbox.id = `region-${index}`;
+                checkbox.value = region.province;
+                checkbox.checked = selectedRegions.includes(region.province);
+                checkbox.addEventListener('change', onRegionSelectionChange);
+                
+                const label = document.createElement('label');
+                label.className = 'region-label';
+                label.htmlFor = `region-${index}`;
+                label.textContent = region.province;
+                
+                const count = document.createElement('span');
+                count.className = 'region-count';
+                count.textContent = `${region.districts.length}개 시군구`;
+                
+                regionItem.appendChild(checkbox);
+                regionItem.appendChild(label);
+                regionItem.appendChild(count);
+                regionsList.appendChild(regionItem);
+            });
+            
+            updateSelectedRegionsInfo();
+        }
+
+        // 지역 선택 변경 처리
+        function onRegionSelectionChange() {
+            const checkboxes = document.querySelectorAll('.region-checkbox');
+            selectedRegions = [];
+            
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    selectedRegions.push(checkbox.value);
+                }
+            });
+            
+            updateSelectedRegionsInfo();
+            saveSelectedRegions();
+        }
+
+        // 선택된 지역 정보 업데이트
+        function updateSelectedRegionsInfo() {
+            const selectedCount = selectedRegions.length;
+            const totalDistricts = selectedRegions.reduce((total, regionName) => {
+                const region = allRegions.find(r => r.province === regionName);
+                return total + (region ? region.districts.length : 0);
+            }, 0);
+            
+            selectedRegionsInfo.textContent = `선택된 지역: ${selectedCount}개 (${totalDistricts}개 시군구)`;
+        }
+
+        // 전체 지역 선택
+        function selectAllRegions() {
+            const checkboxes = document.querySelectorAll('.region-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = true;
+            });
+            onRegionSelectionChange();
+            showNotification('info', '모든 지역이 선택되었습니다.');
+        }
+
+        // 전체 지역 해제
+        function deselectAllRegions() {
+            const checkboxes = document.querySelectorAll('.region-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            onRegionSelectionChange();
+            showNotification('info', '모든 지역 선택이 해제되었습니다.');
+        }
+
+        // 선택된 지역 저장
+        async function saveSelectedRegions() {
+            try {
+                await ipcRenderer.invoke('save-selected-regions', selectedRegions);
+            } catch (error) {
+                console.error('선택된 지역 저장 오류:', error);
+            }
         }
 
         // 기본 키워드 버튼들 업데이트
@@ -894,9 +1102,17 @@
             }
         });
 
+        selectAllRegionsBtn.addEventListener('click', selectAllRegions);
+        deselectAllRegionsBtn.addEventListener('click', deselectAllRegions);
+
         startButton.addEventListener('click', async () => {
             if (keywords.length === 0) {
                 showNotification('error', '검색할 키워드를 먼저 추가해주세요.');
+                return;
+            }
+
+            if (selectedRegions.length === 0) {
+                showNotification('error', '수집할 지역을 먼저 선택해주세요.');
                 return;
             }
 
@@ -913,7 +1129,7 @@
             statisticsPanel.style.display = 'none';
             
             try {
-                const result = await ipcRenderer.invoke('start-scraping', keywords, excludeKeywords);
+                const result = await ipcRenderer.invoke('start-scraping', keywords, excludeKeywords, selectedRegions);
                 
                 if (result.success) {
                     collectedData = result.data;
@@ -1064,6 +1280,12 @@
                 originalDefaultKeywords = allDefaultKeywords;
                 originalDefaultExcludeKeywords = allDefaultExcludeKeywords;
                 
+                // 전체 지역 목록 가져오기
+                allRegions = await ipcRenderer.invoke('get-regions');
+                
+                // 선택된 지역 목록 가져오기
+                selectedRegions = await ipcRenderer.invoke('get-selected-regions');
+                
                 // 삭제되지 않은 기본 키워드만 가져오기
                 const defaultKeywords = await ipcRenderer.invoke('get-default-keywords');
                 const defaultExcludeKeywords = await ipcRenderer.invoke('get-default-exclude-keywords');
@@ -1091,6 +1313,7 @@
                 updateExcludeKeywordList();
                 updateDefaultKeywordButtons();
                 updateDefaultExcludeKeywordButtons();
+                updateRegionsList();
                 
                 addLogEntry('success', '프로그램이 성공적으로 초기화되었습니다.');
             } catch (error) {
