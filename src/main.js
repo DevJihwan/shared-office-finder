@@ -85,8 +85,12 @@ function createWindow() {
   // 메뉴 설정
   createMenu();
 
-  // HTML 파일 로드 (main.js가 src 폴더에 있으므로 상대경로로 index.html)
-  mainWindow.loadFile('index.html');
+  // HTML 파일 로드 - 절대 경로 사용
+  const htmlPath = path.join(__dirname, 'index.html');
+  console.log('HTML 파일 경로:', htmlPath);
+  console.log('HTML 파일 존재 여부:', fs.existsSync(htmlPath));
+  
+  mainWindow.loadFile(htmlPath);
 
   // 윈도우가 준비되면 표시
   mainWindow.once('ready-to-show', () => {
@@ -98,6 +102,11 @@ function createWindow() {
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
   }
+
+  // 로드 실패 시 에러 처리
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error('페이지 로드 실패:', errorCode, errorDescription, validatedURL);
+  });
 
   // 윈도우 닫기 이벤트
   mainWindow.on('closed', () => {
