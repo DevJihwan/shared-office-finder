@@ -406,6 +406,18 @@
             transform: scale(1.05);
         }
 
+        .default-keyword-btn.disabled {
+            background: #95a5a6;
+            color: #7f8c8d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .default-keyword-btn.disabled:hover {
+            transform: none;
+            background: #95a5a6;
+        }
+
         .default-exclude-keyword-btn {
             background: #ffeaa7;
             border: 1px solid #fdcb6e;
@@ -420,6 +432,18 @@
         .default-exclude-keyword-btn:hover {
             background: #ffeaa7;
             transform: scale(1.05);
+        }
+
+        .default-exclude-keyword-btn.disabled {
+            background: #d6d6d6;
+            color: #7f8c8d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .default-exclude-keyword-btn.disabled:hover {
+            transform: none;
+            background: #d6d6d6;
         }
 
         .statistics-panel {
@@ -494,11 +518,9 @@
                     
                     <div class="default-keywords">
                         <div class="default-keywords-label">기본 키워드:</div>
-                        <button class="default-keyword-btn" onclick="addDefaultKeyword('공유오피스')">공유오피스</button>
-                        <button class="default-keyword-btn" onclick="addDefaultKeyword('아임스페이스')">아임스페이스</button>
-                        <button class="default-keyword-btn" onclick="addDefaultKeyword('스마트탑오피스')">스마트탑오피스</button>
-                        <button class="default-keyword-btn" onclick="addDefaultKeyword('더스페이스')">더스페이스</button>
-                        <button class="default-keyword-btn" onclick="addDefaultKeyword('스페이스엑스키')">스페이스엑스키</button>
+                        <div id="defaultKeywordBtns">
+                            <!-- 기본 키워드 버튼들이 동적으로 생성됩니다 -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -515,14 +537,9 @@
                     
                     <div class="default-keywords">
                         <div class="default-keywords-label">기본 제외 키워드:</div>
-                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('카페')">카페</button>
-                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('부동산')">부동산</button>
-                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('공인중개사사무소')">공인중개사</button>
-                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('창업센터')">창업센터</button>
-                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('파티룸')">파티룸</button>
-                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('연습실')">연습실</button>
-                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('세미나')">세미나</button>
-                        <button class="default-exclude-keyword-btn" onclick="addDefaultExcludeKeyword('패스트파이브')">패스트파이브</button>
+                        <div id="defaultExcludeKeywordBtns">
+                            <!-- 기본 제외 키워드 버튼들이 동적으로 생성됩니다 -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -591,6 +608,8 @@
         // 기본 키워드 목록 (config에서 가져온 것)
         let originalDefaultKeywords = [];
         let originalDefaultExcludeKeywords = [];
+        let availableDefaultKeywords = []; // UI에 표시할 키워드들 (삭제되지 않은 것들)
+        let availableDefaultExcludeKeywords = []; // UI에 표시할 제외 키워드들
 
         // DOM 요소들
         const keywordInput = document.getElementById('keywordInput');
@@ -611,6 +630,10 @@
         const progressText = document.getElementById('progressText');
         const progressPercent = document.getElementById('progressPercent');
         const statisticsPanel = document.getElementById('statisticsPanel');
+        
+        // 새로 추가된 DOM 요소들
+        const defaultKeywordBtns = document.getElementById('defaultKeywordBtns');
+        const defaultExcludeKeywordBtns = document.getElementById('defaultExcludeKeywordBtns');
 
         // 알림 표시 함수
         function showNotification(type, message) {
@@ -621,6 +644,50 @@
             setTimeout(() => {
                 notification.classList.remove('show');
             }, 3000);
+        }
+
+        // 기본 키워드 버튼들 업데이트
+        function updateDefaultKeywordButtons() {
+            defaultKeywordBtns.innerHTML = '';
+            
+            availableDefaultKeywords.forEach(keyword => {
+                const btn = document.createElement('button');
+                
+                // 이미 추가된 키워드인지 확인
+                const isAlreadyAdded = keywords.includes(keyword);
+                
+                btn.className = isAlreadyAdded ? 'default-keyword-btn disabled' : 'default-keyword-btn';
+                btn.textContent = keyword;
+                btn.disabled = isAlreadyAdded;
+                
+                if (!isAlreadyAdded) {
+                    btn.onclick = () => addDefaultKeyword(keyword);
+                }
+                
+                defaultKeywordBtns.appendChild(btn);
+            });
+        }
+
+        // 기본 제외 키워드 버튼들 업데이트
+        function updateDefaultExcludeKeywordButtons() {
+            defaultExcludeKeywordBtns.innerHTML = '';
+            
+            availableDefaultExcludeKeywords.forEach(keyword => {
+                const btn = document.createElement('button');
+                
+                // 이미 추가된 키워드인지 확인
+                const isAlreadyAdded = excludeKeywords.includes(keyword);
+                
+                btn.className = isAlreadyAdded ? 'default-exclude-keyword-btn disabled' : 'default-exclude-keyword-btn';
+                btn.textContent = keyword;
+                btn.disabled = isAlreadyAdded;
+                
+                if (!isAlreadyAdded) {
+                    btn.onclick = () => addDefaultExcludeKeyword(keyword);
+                }
+                
+                defaultExcludeKeywordBtns.appendChild(btn);
+            });
         }
 
         // 키워드 추가 함수
@@ -643,6 +710,7 @@
             
             keywords.push(keyword);
             updateKeywordList();
+            updateDefaultKeywordButtons(); // 버튼 상태 업데이트
             addLogEntry('info', `키워드 "${keyword}"가 추가되었습니다.`);
             showNotification('success', `키워드 "${keyword}"가 추가되었습니다.`);
         }
@@ -667,6 +735,7 @@
             
             excludeKeywords.push(keyword);
             updateExcludeKeywordList();
+            updateDefaultExcludeKeywordButtons(); // 버튼 상태 업데이트
             addLogEntry('info', `제외 키워드 "${keyword}"가 추가되었습니다.`);
             showNotification('success', `제외 키워드 "${keyword}"가 추가되었습니다.`);
         }
@@ -708,6 +777,11 @@
             if (originalDefaultKeywords.includes(removedKeyword)) {
                 try {
                     await ipcRenderer.invoke('remove-default-keyword', removedKeyword);
+                    // 사용 가능한 목록에서도 제거하여 버튼이 다시 나타나지 않도록 함
+                    const indexInAvailable = availableDefaultKeywords.indexOf(removedKeyword);
+                    if (indexInAvailable > -1) {
+                        availableDefaultKeywords.splice(indexInAvailable, 1);
+                    }
                     addLogEntry('info', `기본 키워드 "${removedKeyword}"가 영구적으로 제거되었습니다.`);
                 } catch (error) {
                     console.error('기본 키워드 삭제 처리 오류:', error);
@@ -715,6 +789,7 @@
             }
             
             updateKeywordList();
+            updateDefaultKeywordButtons(); // 버튼 상태 업데이트
             addLogEntry('info', `키워드 "${removedKeyword}"가 제거되었습니다.`);
             showNotification('info', `키워드 "${removedKeyword}"가 제거되었습니다.`);
         }
@@ -728,6 +803,11 @@
             if (originalDefaultExcludeKeywords.includes(removedKeyword)) {
                 try {
                     await ipcRenderer.invoke('remove-default-exclude-keyword', removedKeyword);
+                    // 사용 가능한 목록에서도 제거하여 버튼이 다시 나타나지 않도록 함
+                    const indexInAvailable = availableDefaultExcludeKeywords.indexOf(removedKeyword);
+                    if (indexInAvailable > -1) {
+                        availableDefaultExcludeKeywords.splice(indexInAvailable, 1);
+                    }
                     addLogEntry('info', `기본 제외 키워드 "${removedKeyword}"가 영구적으로 제거되었습니다.`);
                 } catch (error) {
                     console.error('기본 제외 키워드 삭제 처리 오류:', error);
@@ -735,6 +815,7 @@
             }
             
             updateExcludeKeywordList();
+            updateDefaultExcludeKeywordButtons(); // 버튼 상태 업데이트
             addLogEntry('info', `제외 키워드 "${removedKeyword}"가 제거되었습니다.`);
             showNotification('info', `제외 키워드 "${removedKeyword}"가 제거되었습니다.`);
         }
@@ -937,6 +1018,8 @@
                 excludeKeywords = [];
                 updateKeywordList();
                 updateExcludeKeywordList();
+                updateDefaultKeywordButtons();
+                updateDefaultExcludeKeywordButtons();
                 collectedData = null;
                 saveButton.style.display = 'none';
                 statisticsPanel.style.display = 'none';
@@ -962,6 +1045,8 @@
             excludeKeywords = [];
             updateKeywordList();
             updateExcludeKeywordList();
+            // 원본 목록도 다시 로드
+            initialize();
             addLogEntry('info', '기본 키워드가 초기화되었습니다. 프로그램을 다시 시작하세요.');
             showNotification('info', '기본 키워드가 초기화되었습니다. 프로그램을 다시 시작하세요.');
         });
@@ -981,11 +1066,31 @@
                 
                 // 삭제되지 않은 기본 키워드만 가져오기
                 const defaultKeywords = await ipcRenderer.invoke('get-default-keywords');
-                defaultKeywords.forEach(keyword => addKeyword(keyword));
-                
-                // 삭제되지 않은 기본 제외 키워드만 가져오기
                 const defaultExcludeKeywords = await ipcRenderer.invoke('get-default-exclude-keywords');
-                defaultExcludeKeywords.forEach(keyword => addExcludeKeyword(keyword));
+                
+                // 사용 가능한 키워드 목록 설정 (UI 버튼에 표시될 것들)
+                availableDefaultKeywords = [...defaultKeywords];
+                availableDefaultExcludeKeywords = [...defaultExcludeKeywords];
+                
+                // 키워드 추가 (중복 방지)
+                defaultKeywords.forEach(keyword => {
+                    if (!keywords.includes(keyword)) {
+                        keywords.push(keyword);
+                    }
+                });
+                
+                // 제외 키워드 추가 (중복 방지)
+                defaultExcludeKeywords.forEach(keyword => {
+                    if (!excludeKeywords.includes(keyword)) {
+                        excludeKeywords.push(keyword);
+                    }
+                });
+                
+                // 화면 업데이트
+                updateKeywordList();
+                updateExcludeKeywordList();
+                updateDefaultKeywordButtons();
+                updateDefaultExcludeKeywordButtons();
                 
                 addLogEntry('success', '프로그램이 성공적으로 초기화되었습니다.');
             } catch (error) {
