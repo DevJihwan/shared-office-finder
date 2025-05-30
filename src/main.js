@@ -52,7 +52,7 @@ function loadUserSettings() {
 function saveUserSettings(settings) {
   try {
     // userData 디렉토리가 없으면 생성
-    if (!fs.existsExists(userDataPath)) {
+    if (!fs.existsSync(userDataPath)) {
       fs.mkdirSync(userDataPath, { recursive: true });
     }
     fs.writeFileSync(userSettingsPath, JSON.stringify(settings, null, 2));
