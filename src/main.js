@@ -32,6 +32,7 @@ function createWindow() {
     height: 800,
     minWidth: 1000,
     minHeight: 600,
+    title: '공유오피스 데이터 수집기',
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
