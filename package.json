@@ -18,7 +18,7 @@
   "license": "MIT",
   "build": {
     "appId": "com.findesharedoffice",
-    "productName": "공유오피스 데이터 수집기",
+    "productName": "Shared Office Finder",
     "directories": {
       "buildResources": "build",
       "output": "dist"
@@ -68,11 +68,11 @@
       "runAfterFinish": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "uninstallDisplayName": "공유오피스 데이터 수집기",
-      "shortcutName": "공유오피스 데이터 수집기",
-      "artifactName": "공유오피스-데이터-수집기-Setup-${version}.${ext}",
+      "uninstallDisplayName": "Shared Office Finder",
+      "shortcutName": "Shared Office Finder",
+      "artifactName": "SharedOfficeFinder-Setup-${version}.${ext}",
       "differentialPackage": false,
-      "menuCategory": "공유오피스 데이터 수집기",
+      "menuCategory": "Shared Office Finder",
       "unicode": false
     },
     "asar": true
