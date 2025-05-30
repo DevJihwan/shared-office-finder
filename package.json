@@ -27,15 +27,8 @@
       "src/**/*",
       "index.html",
       "assets/**/*",
-      "scripts/**/*",
       "!src/**/*.test.js",
       "!**/.DS_Store"
-    ],
-    "extraResources": [
-      {
-        "from": "scripts/cleanup.js",
-        "to": "scripts/cleanup.js"
-      }
     ],
     "mac": {
       "category": "public.app-category.productivity",
@@ -82,14 +75,12 @@
       "uninstallDisplayName": "공유오피스 데이터 수집기",
       "shortcutName": "공유오피스 데이터 수집기",
       "artifactName": "공유오피스-데이터-수집기-Setup-${version}.${ext}",
-      "include": "scripts/installer.nsh",
       "differentialPackage": false,
       "menuCategory": "공유오피스 데이터 수집기",
       "unicode": false
     },
     "asar": true,
     "asarUnpack": [
-      "scripts/cleanup.js",
       "assets/**/*"
     ]
   },
