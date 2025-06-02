@@ -146,6 +146,21 @@ class NaverMapScraper {
   }
 
   /**
+   * 검색 쿼리 생성
+   * @param {string} province - 지역명
+   * @param {string} district - 지역구명 (빈 문자열일 수 있음)
+   * @param {string} keyword - 검색 키워드
+   * @returns {string} - 생성된 쿼리
+   */
+  buildQuery(province, district, keyword) {
+    // 지역구가 빈 문자열이면 지역구 없이 검색
+    if (!district || district.trim() === '') {
+      return `${province} ${keyword}`;
+    }
+    return `${province} ${district} ${keyword}`;
+  }
+
+  /**
    * 여러 지역과 키워드에 대한 데이터 수집
    * @param {Array} regions - 지역 목록
    * @param {Array} keywords - 키워드 목록
@@ -170,7 +185,8 @@ class NaverMapScraper {
     for (const region of regions) {
       for (const district of region.districts) {
         for (const keyword of keywords) {
-          const query = `${region.province} ${district} ${keyword}`;
+          // 수정된 쿼리 생성 로직
+          const query = this.buildQuery(region.province, district, keyword);
           
           try {
             if (logCallback) {
@@ -189,7 +205,7 @@ class NaverMapScraper {
             const enhancedData = data.map(item => ({
               ...item,
               province: region.province,
-              district: district,
+              district: district || '', // 빈 문자열 처리
               keyword: keyword,
               searchQuery: query,
               collectedAt: new Date().toISOString()
