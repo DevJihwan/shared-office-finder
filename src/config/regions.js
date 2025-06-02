@@ -115,6 +115,18 @@ const regions = [
   }
 ];
 
+// 테스트용 지역 설정 (지역구 없이 검색)
+const testRegions = [
+  {
+    province: '서울특별시',
+    districts: [''] // 빈 문자열로 지역구 없이 검색
+  },
+  {
+    province: '서울시',
+    districts: [''] // 축약형으로도 테스트
+  }
+];
+
 // 기본 검색 키워드
 const defaultKeywords = [
   '공유오피스',
@@ -147,6 +159,7 @@ const defaultSelectedRegions = [
 
 module.exports = {
   regions,
+  testRegions, // 테스트용 지역 추가
   defaultKeywords,
   additionalKeywords,
   defaultSelectedRegions
