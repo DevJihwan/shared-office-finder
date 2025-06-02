@@ -5,7 +5,7 @@ const fs = require('fs');
 // 필요한 모듈들 import
 const NaverMapScraper = require('./scrapers/naverMapScraper');
 const dataProcessor = require('./utils/dataProcessor');
-const { regions, defaultKeywords, defaultSelectedRegions } = require('./config/regions');
+const { regions, testRegions, defaultKeywords, defaultSelectedRegions } = require('./config/regions');
 
 // 기본 제외 키워드 목록
 const defaultExcludeKeywords = [
@@ -42,7 +42,8 @@ function loadUserSettings() {
   return {
     removedDefaultKeywords: [],
     removedDefaultExcludeKeywords: [],
-    selectedRegions: defaultSelectedRegions
+    selectedRegions: defaultSelectedRegions,
+    testMode: false // 테스트 모드 플래그 추가
   };
 }
 
@@ -145,6 +146,13 @@ function createMenu() {
         },
         { type: 'separator' },
         {
+          label: '테스트 모드 토글',
+          click: () => {
+            toggleTestMode();
+          }
+        },
+        { type: 'separator' },
+        {
           label: '종료',
           accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
           click: () => {
@@ -218,6 +226,29 @@ function createMenu() {
 
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
+}
+
+/**
+ * 테스트 모드 토글 (메뉴에서 사용)
+ */
+function toggleTestMode() {
+  const settings = loadUserSettings();
+  settings.testMode = !settings.testMode;
+  saveUserSettings(settings);
+  
+  const mode = settings.testMode ? '테스트 모드' : '일반 모드';
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: '모드 변경',
+    message: `${mode}로 전환되었습니다.`,
+    detail: settings.testMode ? 
+      '서울특별시/서울시 전체 검색이 가능합니다.' : 
+      '일반적인 지역구별 검색으로 돌아갑니다.',
+    buttons: ['확인']
+  });
+  
+  // 화면에 모드 변경 알림 전송
+  mainWindow.webContents.send('test-mode-changed', settings.testMode);
 }
 
 /**
@@ -333,14 +364,35 @@ app.on('activate', () => {
 // IPC 핸들러들
 
 /**
- * 전체 지역 목록 반환
+ * 전체 지역 목록 반환 (테스트 모드에 따라 다른 지역 반환)
  */
 ipcMain.handle('get-regions', async () => {
   try {
+    const userSettings = loadUserSettings();
+    
+    // 테스트 모드일 때는 testRegions 반환
+    if (userSettings.testMode) {
+      console.log('테스트 모드: testRegions 반환');
+      return testRegions;
+    }
+    
     return regions;
   } catch (error) {
     console.error(`지역 목록 로드 오류: ${error.message}`);
     return [];
+  }
+});
+
+/**
+ * 현재 테스트 모드 상태 반환
+ */
+ipcMain.handle('get-test-mode', async () => {
+  try {
+    const userSettings = loadUserSettings();
+    return userSettings.testMode || false;
+  } catch (error) {
+    console.error(`테스트 모드 상태 로드 오류: ${error.message}`);
+    return false;
   }
 });
 
@@ -500,13 +552,19 @@ ipcMain.handle('start-scraping', async (event, keywords, excludeKeywords = [], s
       sendLogMessage('info', `제외 키워드: ${excludeKeywords.join(', ')}`);
     }
     
-    // 선택된 지역만 필터링
-    let targetRegions = regions;
+    // 현재 모드에 따라 지역 목록 선택
+    const userSettings = loadUserSettings();
+    let targetRegions = userSettings.testMode ? testRegions : regions;
+    
     if (selectedRegionNames && selectedRegionNames.length > 0) {
-      targetRegions = regions.filter(region => selectedRegionNames.includes(region.province));
+      targetRegions = targetRegions.filter(region => selectedRegionNames.includes(region.province));
       sendLogMessage('info', `선택된 지역: ${selectedRegionNames.join(', ')}`);
     } else {
       sendLogMessage('warning', '선택된 지역이 없습니다. 전체 지역에서 수집합니다.');
+    }
+    
+    if (userSettings.testMode) {
+      sendLogMessage('info', '🧪 테스트 모드: 지역구 없이 검색합니다.');
     }
     
     sendProgress(0, '데이터 수집 준비 중...');
