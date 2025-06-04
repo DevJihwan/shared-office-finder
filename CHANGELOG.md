@@ -1,176 +1,113 @@
-# 변경 로그
+# Changelog
 
-공유오피스 데이터 수집기의 모든 주요 변경사항이 이 파일에 기록됩니다.
+All notable changes to this project will be documented in this file.
 
-이 프로젝트는 [Semantic Versioning](https://semver.org/lang/ko/)을 따릅니다.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2024-01-15
+## [1.1.0] - 2025-06-04
 
-### 추가됨 (Added)
-- ✨ 네이버 지도 API를 활용한 데이터 수집 기능
-- 🏢 전국 지역별 공유오피스 검색 지원
-- 🔍 다중 키워드 검색 기능
-  - 공유오피스
-  - 아임스페이스
-  - 스마트탑오피스
-  - 더스페이스
-  - 스페이스엑스키
-- 📊 실시간 데이터 수집 진행률 표시
-- 📝 실시간 로그 모니터링 시스템
-- 💾 Excel (.xlsx) 및 JSON 형식 데이터 내보내기
-- 🔄 자동 중복 데이터 제거 기능
-- 📈 수집 통계 정보 제공
-  - 총 데이터 수
-  - 전화번호 보유율
-  - 홈페이지 보유율
-  - 수집 지역 수
-- 🎨 Modern UI 디자인 적용
-  - Glass morphism 효과
-  - 푸른색 계열 색상 테마
-  - 애니메이션 효과
-- ⚡ 자동 재시도 로직 (네트워크 오류 시)
-- 🛡️ 포괄적인 에러 처리 시스템
-- 📱 반응형 UI 지원
-- 🔔 실시간 알림 시스템
-- 🎯 키워드 태그 기반 관리 인터페이스
-- 🌐 전국 17개 시도 + 시군구 완전 지원
+### Added
+- **🔄 Dual API Data Collection System**
+  - Added NaverGraphQLScraper for enhanced data collection using GraphQL API
+  - Implemented dual scraper architecture for comprehensive data coverage
+  - Added intelligent data integration with business name deduplication
+  
+- **🔧 Enhanced Data Processing**
+  - Added `combineDataSources()` method in DataProcessor for smart data merging
+  - Implemented business name-based duplicate detection and removal
+  - Added data source tracking (naver_map vs graphql) in collected data
+  - Enhanced statistics with source distribution information
 
-### 기술적 구현 (Technical)
-- 🔧 Electron 35.1.2 기반 데스크톱 애플리케이션
-- 📦 Node.js 백엔드 아키텍처
-- 🌐 Axios를 이용한 HTTP 요청 처리
-- 📄 XLSX 라이브러리를 통한 Excel 파일 생성
-- 🔄 IPC (Inter-Process Communication) 통신
-- 📂 모듈화된 코드 구조
-- ⚙️ 크로스 플랫폼 빌드 지원
+- **📊 Improved Analytics**
+  - Added GraphQL-specific collection statistics
+  - Enhanced duplicate removal reporting with source breakdown
+  - Added data source distribution in final statistics
+  - Improved logging with API source identification
 
-### 보안 및 안정성 (Security & Stability)
-- 🛡️ 로컬 데이터 저장만 지원 (개인정보 보호)
-- 🔒 입력 데이터 검증 및 이스케이프
-- 🔄 Exponential backoff 재시도 패턴
-- ⚡ 메모리 누수 방지 최적화
-- 🚫 Rate limiting으로 서버 부하 방지
+- **🛠️ Technical Improvements**
+  - Added retry logic with exponential backoff for GraphQL API
+  - Implemented proper error handling for dual API system
+  - Added progress tracking for both collection phases
+  - Enhanced data validation and cleaning processes
 
-### 사용자 경험 (User Experience)
-- 🎨 직관적인 드래그 앤 드롭 인터페이스
-- 📱 반응형 레이아웃
-- 🔔 실시간 알림 및 피드백
-- 📊 시각적 진행률 표시
-- 🎯 원클릭 기본 키워드 추가
-- 💫 부드러운 애니메이션 효과
+### Changed
+- **Data Collection Flow**: Now uses two-phase collection (Map API → GraphQL API → Integration)
+- **Statistics Calculation**: Enhanced to include source distribution and integration metrics
+- **Data Schema**: Added '데이터소스' field to track data origin
+- **Progress Reporting**: Improved to show progress for both API sources separately
 
-### 데이터 품질 (Data Quality)
-- 🔍 중복 데이터 자동 감지 및 제거
-- 📞 전화번호 자동 포맷팅
-- 🌐 URL 유효성 검증
-- 📍 주소 정보 표준화
-- 💰 가격 정보 추출 및 정제
-- 📅 수집 일시 자동 기록
+### Enhanced
+- **Data Coverage**: Significantly improved by using multiple API endpoints
+- **Duplicate Handling**: More sophisticated deduplication based on business names
+- **User Experience**: Better progress reporting and detailed collection statistics
+- **Documentation**: Comprehensive README with dual API architecture explanation
 
-### 성능 최적화 (Performance)
-- ⚡ 비동기 처리로 UI 블로킹 방지
-- 🔄 페이지네이션을 통한 메모리 효율성
-- 📦 데이터 스트리밍 처리
-- 🎯 지능적 요청 간격 조절
-- 💾 효율적인 메모리 관리
+### Technical Details
+- **New Files**:
+  - `src/scrapers/naverGraphQLScraper.js` - GraphQL API scraper implementation
+  - Updated `src/utils/dataProcessor.js` - Enhanced with data integration capabilities
+  - Updated `src/main.js` - Integrated dual scraper system
+  - Added comprehensive `README.md` - Detailed documentation
 
-### 개발자 도구 (Developer Tools)
-- 🐛 상세한 디버깅 로그
-- 📊 성능 모니터링
-- 🔧 개발자 콘솔 지원
-- 📝 포괄적인 API 문서
-- 🧪 테스트 가이드라인
+- **API Integration**:
+  - Primary: Naver Map Search API (existing)
+  - Secondary: Naver GraphQL Places API (new)
+  - Integration: Business name-based deduplication
 
----
+## [1.0.0] - 2024-12-XX
 
-## 향후 계획 (Roadmap)
+### Added
+- Initial release of shared-office finder
+- Basic Naver Map API data collection
+- Regional search capabilities
+- Keyword-based filtering
+- Excel and JSON export functionality
+- Electron-based desktop application
+- Data deduplication and cleaning
+- Progress tracking and logging
+- User settings persistence
 
-### [1.1.0] - 예정
-- 🔍 검색 필터 고도화
-- 📊 차트 기반 통계 시각화
-- 🌙 다크 테마 지원
-- 🌐 다국어 지원 (영어)
-- 📱 모바일 반응형 개선
+### Features
+- **Data Collection**
+  - Naver Map API integration
+  - Regional (province/district) search
+  - Keyword and exclude keyword filtering
+  - Pagination support for large datasets
 
-### [1.2.0] - 예정
-- 🤖 AI 기반 데이터 품질 개선
-- 🔗 다른 지도 서비스 통합
-- ☁️ 클라우드 저장소 연동
-- 📧 이메일 리포트 기능
-- 🔔 스케줄링 기능
+- **Data Processing**
+  - Automatic duplicate removal
+  - Phone number formatting
+  - Address standardization
+  - Data validation and cleaning
 
-### [2.0.0] - 계획 중
-- 🌐 웹 버전 출시
-- 📱 모바일 앱 개발
-- 🔄 실시간 데이터 동기화
-- 👥 팀 협업 기능
-- 🎯 고급 분석 도구
+- **Export Options**
+  - Excel (.xlsx) format with proper column formatting
+  - JSON format with metadata
+  - Customizable file naming
+
+- **User Interface**
+  - Intuitive Electron desktop application
+  - Real-time progress tracking
+  - Detailed logging and statistics
+  - Customizable region and keyword selection
+
+- **Configuration**
+  - User settings persistence
+  - Default keyword management
+  - Regional selection preferences
+  - Error handling and retry logic
 
 ---
 
-## 지원 중단 (Deprecated)
+## Version History Summary
 
-현재 지원 중단된 기능이 없습니다.
+### v1.1.0 (Current)
+- **Dual API System**: Added GraphQL API for enhanced data collection
+- **Smart Integration**: Intelligent deduplication and data merging
+- **Improved Coverage**: Significantly more comprehensive data collection
 
----
-
-## 보안 업데이트 (Security)
-
-### [1.0.0]
-- 🛡️ 초기 보안 정책 수립
-- 🔒 데이터 암호화 적용
-- 🚫 XSS 및 인젝션 공격 방어
-- 🔐 안전한 파일 저장 메커니즘
-
----
-
-## 알려진 이슈 (Known Issues)
-
-### 현재 버전 (1.0.0)
-- ⚠️ 대용량 데이터 수집 시 메모리 사용량 증가 (10,000개 이상)
-- ⚠️ 일부 특수문자가 포함된 키워드 검색 제한
-- ⚠️ macOS에서 첫 실행 시 보안 경고 표시
-
-### 해결 예정
-- 🔧 메모리 최적화 (v1.0.1)
-- 🔧 특수문자 지원 개선 (v1.1.0)
-- 🔧 macOS 공증 인증서 적용 (v1.0.1)
-
----
-
-## 기여자 (Contributors)
-
-### 개발팀
-- **DataLink-Studio** - 프로젝트 리드, 백엔드 개발
-- **UI/UX Team** - 인터페이스 디자인
-- **QA Team** - 품질 보증 및 테스트
-
-### 특별 감사
-- 베타 테스터 여러분
-- 피드백을 제공해주신 사용자 분들
-- 오픈소스 커뮤니티
-
----
-
-## 라이선스 (License)
-
-MIT License © 2024 DataLink-Studio
-
-자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
-
----
-
-## 다운로드 (Download)
-
-### 최신 버전 (1.0.0)
-- **Windows:** [공유오피스-데이터-수집기-Setup-1.0.0.exe](https://github.com/DevJihwan/shared-office-finder/releases/download/v1.0.0/공유오피스-데이터-수집기-Setup-1.0.0.exe)
-- **macOS:** [공유오피스-데이터-수집기-1.0.0.dmg](https://github.com/DevJihwan/shared-office-finder/releases/download/v1.0.0/공유오피스-데이터-수집기-1.0.0.dmg)
-- **Linux:** [공유오피스-데이터-수집기-1.0.0.AppImage](https://github.com/DevJihwan/shared-office-finder/releases/download/v1.0.0/공유오피스-데이터-수집기-1.0.0.AppImage)
-
-### 시스템 요구사항
-- **Windows:** Windows 10 이상
-- **macOS:** macOS 10.15 이상
-- **Linux:** Ubuntu 18.04 이상 또는 동등한 배포판
-- **메모리:** 4GB RAM 권장
-- **저장공간:** 100MB 이상
-- **네트워크:** 인터넷 연결 필수
+### v1.0.0
+- **Initial Release**: Basic Naver Map API scraping functionality
+- **Core Features**: Regional search, keyword filtering, export capabilities
+- **Desktop App**: Electron-based user interface with progress tracking
