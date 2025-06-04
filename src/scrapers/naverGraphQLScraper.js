@@ -39,7 +39,8 @@ class NaverGraphQLScraper {
   }
 
   /**
-   * GraphQL 쿼리
+   * GraphQL 쿼리 문자열 반환
+   * @returns {string} - GraphQL 쿼리
    */
   getGraphQLQuery() {
     return `
@@ -85,16 +86,19 @@ class NaverGraphQLScraper {
       try {
         return await requestFn();
       } catch (err) {
-        console.error(`[${query}] 시도 ${attempt}/${retries} 에러:`, err.message);
+        console.error(`[GraphQL][${query}] 시도 ${attempt}/${retries} 에러:`, err.message);
         if (err.response) {
-          console.error(`[${query}] 응답 상태: ${err.response.status}`);
+          console.error(`[GraphQL][${query}] 응답 상태: ${err.response.status}`);
+          if (err.response.data) {
+            console.error(`[GraphQL][${query}] 응답 데이터:`, JSON.stringify(err.response.data, null, 2));
+          }
         }
         
         if (err.response && err.response.status === 503) {
           if (attempt === retries) {
             throw new Error(`최대 재시도 횟수(${retries}) 초과: ${err.message}`);
           }
-          console.warn(`[${query}] HTTP 503 에러, ${backoff}ms 후 재시도 (${attempt}/${retries})`);
+          console.warn(`[GraphQL][${query}] HTTP 503 에러, ${backoff}ms 후 재시도 (${attempt}/${retries})`);
           await new Promise(resolve => setTimeout(resolve, backoff));
           backoff *= 2;
         } else {
@@ -139,7 +143,17 @@ class NaverGraphQLScraper {
         timeout: 30000 // 30초 타임아웃
       });
       
-      return response.data[0].data.businesses;
+      // 응답 구조 검증
+      if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
+        throw new Error('Invalid response structure');
+      }
+      
+      const businessData = response.data[0]?.data?.businesses;
+      if (!businessData) {
+        throw new Error('Business data not found in response');
+      }
+      
+      return businessData;
     }, query);
   }
 
@@ -164,24 +178,24 @@ class NaverGraphQLScraper {
         return [];
       }
 
-      totalCount = firstResult.total;
+      totalCount = firstResult.total || 0;
       console.log(`[GraphQL][${query}] 전체 결과 개수: ${totalCount}`);
       
       // 첫 페이지 데이터 추가
-      if (firstResult.items) {
+      if (firstResult.items && Array.isArray(firstResult.items)) {
         allData.push(...firstResult.items);
       }
       
       start += this.display;
 
       // 나머지 페이지들 순차적으로 요청
-      while (start <= totalCount && start <= 1000) { // 최대 1000개까지만 수집
+      while (start <= totalCount && start <= 1000 && allData.length < 1000) { // 최대 1000개까지만 수집
         try {
           console.log(`[GraphQL][${query}] 페이지 ${Math.ceil(start / this.display)} 요청 중... (${start}/${totalCount})`);
           
           const result = await this.fetchPage(query, start);
           
-          if (result && result.items) {
+          if (result && result.items && Array.isArray(result.items)) {
             allData.push(...result.items);
           }
           
@@ -217,17 +231,19 @@ class NaverGraphQLScraper {
    * @returns {string} - 파싱된 지역 정보
    */
   parseRegionFromItem(item) {
-    if (item.commonAddress && item.commonAddress.length > 0) {
+    if (item.commonAddress && Array.isArray(item.commonAddress) && item.commonAddress.length > 0) {
       return item.commonAddress[0];
     }
     
     // commonAddress가 없으면 address에서 추출
-    if (item.address) {
+    if (item.address && typeof item.address === 'string') {
       const addressParts = item.address.split(' ');
       if (addressParts.length >= 3) {
         return `${addressParts[0]} ${addressParts[1]} ${addressParts[2]}`;
       } else if (addressParts.length >= 2) {
         return `${addressParts[0]} ${addressParts[1]}`;
+      } else if (addressParts.length === 1) {
+        return addressParts[0];
       }
     }
     
@@ -246,23 +262,23 @@ class NaverGraphQLScraper {
   transformGraphQLItem(item, province, district, keyword, searchQuery) {
     return {
       // 기존 naverMapScraper와 동일한 필드 구조 유지
-      name: item.name,
-      tel: item.phone || item.virtualPhone,
-      address: item.address,
-      roadAddress: item.roadAddress,
+      name: item.name || '',
+      tel: item.phone || item.virtualPhone || '',
+      address: item.address || '',
+      roadAddress: item.roadAddress || '',
       shortAddress: item.commonAddress || [],
-      province: province,
-      district: district,
-      keyword: keyword,
-      searchQuery: searchQuery,
+      province: province || '',
+      district: district || '',
+      keyword: keyword || '',
+      searchQuery: searchQuery || '',
       collectedAt: new Date().toISOString(),
       // GraphQL 전용 추가 정보
-      id: item.id,
-      category: item.category,
-      x: item.x,
-      y: item.y,
-      visitorReviewCount: item.visitorReviewCount,
-      visitorReviewScore: item.visitorReviewScore,
+      id: item.id || '',
+      category: item.category || '',
+      x: item.x || '',
+      y: item.y || '',
+      visitorReviewCount: item.visitorReviewCount || 0,
+      visitorReviewScore: item.visitorReviewScore || 0,
       source: 'graphql' // 데이터 출처 구분
     };
   }
@@ -280,9 +296,23 @@ class NaverGraphQLScraper {
     let totalQueries = 0;
     let completedQueries = 0;
 
+    // 입력 데이터 검증
+    if (!Array.isArray(regions) || !Array.isArray(keywords)) {
+      throw new Error('regions와 keywords는 배열이어야 합니다.');
+    }
+
+    if (regions.length === 0 || keywords.length === 0) {
+      if (logCallback) {
+        logCallback('warning', '[GraphQL] 지역 또는 키워드가 비어있습니다.');
+      }
+      return [];
+    }
+
     // 전체 쿼리 수 계산
     regions.forEach(region => {
-      totalQueries += region.districts.length * keywords.length;
+      if (region.districts && Array.isArray(region.districts)) {
+        totalQueries += region.districts.length * keywords.length;
+      }
     });
 
     if (logCallback) {
@@ -290,6 +320,13 @@ class NaverGraphQLScraper {
     }
 
     for (const region of regions) {
+      if (!region.province || !region.districts || !Array.isArray(region.districts)) {
+        if (logCallback) {
+          logCallback('warning', `[GraphQL] 잘못된 지역 데이터: ${JSON.stringify(region)}`);
+        }
+        continue;
+      }
+
       for (const district of region.districts) {
         for (const keyword of keywords) {
           const query = `${region.province} ${district} ${keyword}`;
