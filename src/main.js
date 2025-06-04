@@ -4,6 +4,7 @@ const fs = require('fs');
 
 // 필요한 모듈들 import
 const NaverMapScraper = require('./scrapers/naverMapScraper');
+const NaverGraphQLScraper = require('./scrapers/naverGraphQLScraper');
 const dataProcessor = require('./utils/dataProcessor');
 const { regions, defaultKeywords, defaultSelectedRegions } = require('./config/regions');
 
@@ -21,7 +22,8 @@ const defaultExcludeKeywords = [
 ];
 
 let mainWindow;
-let scraper;
+let mapScraper;
+let graphqlScraper;
 
 // 사용자 설정 파일 경로
 const userDataPath = app.getPath('userData');
@@ -260,7 +262,7 @@ function showAboutDialog() {
     type: 'info',
     title: '공유오피스 데이터 수집기 정보',
     message: '공유오피스 데이터 수집기',
-    detail: `버전: 1.0.0\n개발자: DataLink-Studio\n\n네이버 지도 API를 활용하여 전국의 공유오피스, 코워킹스페이스 정보를 수집하는 프로그램입니다.`,
+    detail: `버전: 1.0.0\\n개발자: DataLink-Studio\\n\\n네이버 지도 API를 활용하여 전국의 공유오피스, 코워킹스페이스 정보를 수집하는 프로그램입니다.`,
     buttons: ['확인']
   });
 }
@@ -286,13 +288,19 @@ function sendProgress(progress, status) {
 /**
  * 수집 통계 계산
  */
-function calculateStatistics(data, excludedCount = 0) {
+function calculateStatistics(data, excludedCount = 0, graphqlAddedCount = 0, graphqlDuplicateCount = 0) {
   const stats = {
     totalCount: data.length,
     withPhoneNumber: data.filter(item => item['전화번호'] && item['전화번호'].trim()).length,
     withWebsite: data.filter(item => item['홈페이지'] && item['홈페이지'].trim()).length,
     excludedCount: excludedCount,
-    regionStats: {}
+    graphqlAddedCount: graphqlAddedCount,
+    graphqlDuplicateCount: graphqlDuplicateCount,
+    regionStats: {},
+    sourceStats: {
+      naver_map: data.filter(item => (item['데이터소스'] || 'naver_map') === 'naver_map').length,
+      graphql: data.filter(item => item['데이터소스'] === 'graphql').length
+    }
   };
 
   // 지역별 통계 (지역 + 지역구 조합으로 계산)
@@ -315,7 +323,8 @@ app.whenReady().then(() => {
   createWindow();
   
   // Scraper 인스턴스 생성
-  scraper = new NaverMapScraper();
+  mapScraper = new NaverMapScraper();
+  graphqlScraper = new NaverGraphQLScraper();
 });
 
 app.on('window-all-closed', () => {
@@ -442,7 +451,7 @@ ipcMain.handle('remove-default-keyword', async (event, keyword) => {
         const success = saveUserSettings(userSettings);
         
         if (success) {
-          console.log(`기본 키워드 "${keyword}"가 삭제 목록에 추가되었습니다.`);
+          console.log(`기본 키워드 \"${keyword}\"가 삭제 목록에 추가되었습니다.`);
           return { success: true };
         } else {
           return { success: false, error: '설정 저장 실패' };
@@ -475,7 +484,7 @@ ipcMain.handle('remove-default-exclude-keyword', async (event, keyword) => {
         const success = saveUserSettings(userSettings);
         
         if (success) {
-          console.log(`기본 제외 키워드 "${keyword}"가 삭제 목록에 추가되었습니다.`);
+          console.log(`기본 제외 키워드 \"${keyword}\"가 삭제 목록에 추가되었습니다.`);
           return { success: true };
         } else {
           return { success: false, error: '설정 저장 실패' };
@@ -491,11 +500,11 @@ ipcMain.handle('remove-default-exclude-keyword', async (event, keyword) => {
 });
 
 /**
- * 데이터 수집 시작
+ * 데이터 수집 시작 (두 스크래퍼 통합)
  */
 ipcMain.handle('start-scraping', async (event, keywords, excludeKeywords = [], selectedRegionNames = []) => {
   try {
-    sendLogMessage('info', `데이터 수집을 시작합니다. 키워드: ${keywords.join(', ')}`);
+    sendLogMessage('info', `통합 데이터 수집을 시작합니다. 키워드: ${keywords.join(', ')}`);
     if (excludeKeywords.length > 0) {
       sendLogMessage('info', `제외 키워드: ${excludeKeywords.join(', ')}`);
     }
@@ -511,36 +520,62 @@ ipcMain.handle('start-scraping', async (event, keywords, excludeKeywords = [], s
     
     sendProgress(0, '데이터 수집 준비 중...');
 
-    // 모든 데이터 수집
-    const rawData = await scraper.collectAllData(
+    // 1단계: 기본 네이버 지도 API로 데이터 수집
+    sendLogMessage('info', '1단계: 네이버 지도 API 데이터 수집 시작...');
+    const mapRawData = await mapScraper.collectAllData(
       targetRegions,
       keywords,
       (progress, status) => {
-        sendProgress(progress, status);
+        sendProgress(progress * 0.4, `[지도 API] ${status}`); // 전체의 40%
       },
       (type, message) => {
-        sendLogMessage(type, message);
+        sendLogMessage(type, `[지도 API] ${message}`);
       }
     );
 
-    sendLogMessage('info', `원본 데이터 수집 완료: ${rawData.length}개`);
-    console.log('Raw data sample:', rawData.slice(0, 2)); // 디버깅용
+    sendLogMessage('info', `지도 API 원본 데이터 수집 완료: ${mapRawData.length}개`);
 
-    if (rawData.length === 0) {
-      throw new Error('수집된 데이터가 없습니다.');
+    // 2단계: GraphQL API로 추가 데이터 수집
+    sendLogMessage('info', '2단계: GraphQL API 데이터 수집 시작...');
+    const graphqlRawData = await graphqlScraper.collectAllData(
+      targetRegions,
+      keywords,
+      (progress, status) => {
+        sendProgress(40 + (progress * 0.4), `[GraphQL API] ${status}`); // 40%~80%
+      },
+      (type, message) => {
+        sendLogMessage(type, `[GraphQL API] ${message}`);
+      }
+    );
+
+    sendLogMessage('info', `GraphQL API 원본 데이터 수집 완료: ${graphqlRawData.length}개`);
+
+    if (mapRawData.length === 0 && graphqlRawData.length === 0) {
+      throw new Error('두 API 모두에서 수집된 데이터가 없습니다.');
     }
 
-    sendLogMessage('info', '데이터 정제 중...');
-    sendProgress(95, '데이터 정제 중...');
+    sendProgress(80, '데이터 처리 및 통합 중...');
+    sendLogMessage('info', '3단계: 데이터 처리 및 통합 시작...');
 
-    // 데이터 정제 및 처리
-    const processedData = dataProcessor.processData(rawData);
-    sendLogMessage('info', `데이터 처리 완료: ${processedData.length}개`);
-    console.log('Processed data sample:', processedData.slice(0, 2)); // 디버깅용
+    // 각각 데이터 처리
+    const processedMapData = dataProcessor.processData(mapRawData);
+    const processedGraphqlData = dataProcessor.processData(graphqlRawData);
+    
+    sendLogMessage('info', `처리된 지도 API 데이터: ${processedMapData.length}개`);
+    sendLogMessage('info', `처리된 GraphQL API 데이터: ${processedGraphqlData.length}개`);
 
-    const deduplicatedData = dataProcessor.deduplicateData(processedData);
-    sendLogMessage('info', `중복 제거 완료: ${deduplicatedData.length}개`);
-    console.log('Deduplicated data sample:', deduplicatedData.slice(0, 2)); // 디버깅용
+    // 데이터 통합 (상호명 기준 중복 제거)
+    const integrationResult = dataProcessor.combineDataSources(processedMapData, processedGraphqlData);
+    const combinedData = integrationResult.combinedData;
+    const graphqlAddedCount = integrationResult.addedCount;
+    const graphqlDuplicateCount = integrationResult.duplicateCount;
+
+    sendLogMessage('success', `데이터 통합 완료: 기존 ${processedMapData.length}개 + 신규 ${graphqlAddedCount}개 = 총 ${combinedData.length}개`);
+    sendLogMessage('info', `GraphQL에서 중복으로 제외된 데이터: ${graphqlDuplicateCount}개`);
+
+    // 전체 데이터 중복 제거
+    const deduplicatedData = dataProcessor.deduplicateData(combinedData);
+    sendLogMessage('info', `최종 중복 제거 완료: ${deduplicatedData.length}개`);
 
     // 제외 키워드 필터링 적용
     const { filteredData, excludedCount } = dataProcessor.filterByExcludeKeywords(deduplicatedData, excludeKeywords);
@@ -548,18 +583,20 @@ ipcMain.handle('start-scraping', async (event, keywords, excludeKeywords = [], s
 
     const cleanedData = dataProcessor.cleanData(filteredData);
     sendLogMessage('info', `데이터 정리 완료: ${cleanedData.length}개`);
-    console.log('Cleaned data sample:', cleanedData.slice(0, 2)); // 디버깅용
 
     // 데이터 검증
     if (cleanedData.length === 0) {
       throw new Error('데이터 처리 후 유효한 데이터가 없습니다.');
     }
 
-    // 통계 계산 (제외된 데이터 수 포함)
-    const statistics = calculateStatistics(cleanedData, excludedCount);
+    // 통계 계산 (GraphQL 통합 정보 포함)
+    const statistics = calculateStatistics(cleanedData, excludedCount, graphqlAddedCount, graphqlDuplicateCount);
 
-    sendProgress(100, '데이터 수집 완료!');
-    sendLogMessage('success', `데이터 수집이 완료되었습니다. 총 ${cleanedData.length}개의 데이터를 수집했습니다.`);
+    sendProgress(100, '통합 데이터 수집 완료!');
+    sendLogMessage('success', `통합 데이터 수집이 완료되었습니다!`);
+    sendLogMessage('success', `- 지도 API: ${statistics.sourceStats.naver_map}개`);
+    sendLogMessage('success', `- GraphQL API: ${statistics.sourceStats.graphql}개`);
+    sendLogMessage('success', `- 총 수집: ${cleanedData.length}개`);
 
     return {
       success: true,
@@ -569,9 +606,9 @@ ipcMain.handle('start-scraping', async (event, keywords, excludeKeywords = [], s
     };
 
   } catch (error) {
-    console.error(`데이터 수집 오류: ${error.message}`);
+    console.error(`통합 데이터 수집 오류: ${error.message}`);
     console.error('Error stack:', error.stack);
-    sendLogMessage('error', `데이터 수집 실패: ${error.message}`);
+    sendLogMessage('error', `통합 데이터 수집 실패: ${error.message}`);
     return {
       success: false,
       error: error.message
