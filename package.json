@@ -1,11 +1,13 @@
 {
   "name": "findesharedoffice",
-  "version": "1.0.0",
-  "description": "Finding Shared Office Data",
+  "version": "1.1.0",
+  "description": "Finding Shared Office Data with Dual API Support",
   "main": "src/main.js",
   "scripts": {
     "start": "electron src/main.js",
     "dev": "NODE_ENV=development electron src/main.js",
+    "test": "node test-graphql-scraper.js",
+    "test:graphql": "node test-graphql-scraper.js",
     "pack": "electron-builder --dir",
     "build": "electron-builder",
     "build:win": "electron-builder --win --x64 --ia32 --config.nsis.unicode=false",
@@ -16,6 +18,19 @@
   },
   "author": "DataLink-Studio",
   "license": "MIT",
+  "keywords": [
+    "shared-office",
+    "coworking",
+    "naver-map",
+    "graphql",
+    "data-scraper",
+    "electron",
+    "korea"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DevJihwan/shared-office-finder.git"
+  },
   "build": {
     "appId": "com.findesharedoffice",
     "productName": "Shared Office Finder",
@@ -27,7 +42,8 @@
       "src/**/*",
       "index.html",
       "!src/**/*.test.js",
-      "!**/.DS_Store"
+      "!**/.DS_Store",
+      "!test-graphql-scraper.js"
     ],
     "mac": {
       "category": "public.app-category.productivity",
